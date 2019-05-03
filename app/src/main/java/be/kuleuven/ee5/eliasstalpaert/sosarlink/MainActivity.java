@@ -41,8 +41,8 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent();
         intent.setAction(Intent.ACTION_VIEW);
         intent.setData(Uri.parse("ftp://" + ftpHost));
-        intent.putExtra("ftp_username","stalpaard");
-        intent.putExtra("ftp_password","7426985");
+        intent.putExtra("ftp_username","pi");
+        intent.putExtra("ftp_password","sosar");
         startActivity(intent);
     }
 
