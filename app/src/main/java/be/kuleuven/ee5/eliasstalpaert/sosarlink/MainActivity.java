@@ -75,12 +75,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void messageTcp() {
-        /*
+
         if (mTcpClient != null) {
             char message = '1';
             mTcpClient.sendMessage(message);
         }
-        */
+
     }
 
     public void closeTcp() {

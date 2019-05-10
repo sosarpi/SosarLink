@@ -102,6 +102,7 @@ public class TcpClient {
 
                     if(mBufferIn.ready()){
                         mServerMessage = mBufferIn.readLine();
+                        mServerMessage = mBufferIn.readLine();
                     }
 
                     if (mServerMessage != null && mMessageListener != null) {
