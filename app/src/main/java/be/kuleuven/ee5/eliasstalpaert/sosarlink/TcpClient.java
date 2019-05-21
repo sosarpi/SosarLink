@@ -29,14 +29,11 @@ public class TcpClient {
     // used to read messages from the server
     private BufferedReader mBufferIn;
 
-    //private TextView receivedText;
-
     /**
      * Constructor of the class. OnMessagedReceived listens for the messages received from server
      */
     public TcpClient(OnMessageReceived listener) {
         mMessageListener = listener;
-        //this.receivedText = receivedText;
     }
 
     /**
@@ -115,8 +112,6 @@ public class TcpClient {
                         if (mServerMessage != null && mMessageListener != null) {
                             //call the method messageReceived from MyActivity class
                             mMessageListener.messageReceived(mServerMessage);
-                            //CharSequence old = receivedText.getText();
-                            //receivedText.setText(old + mServerMessage);
                             Log.d("RESPONSE FROM SERVER", "S: Received Message: '" + mServerMessage + "'");
                             if(mServerMessage.contains("no")) {
                                 stopClient();
