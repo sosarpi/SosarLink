@@ -20,9 +20,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -37,9 +39,6 @@ public class PassesFragment extends Fragment {
     private RecyclerView.LayoutManager mLayoutManager;
 
     private RecyclerAdapter mAdapterCasted;
-    //private ArrayList<RecyclerItem> recyclerList;
-
-    private Button refreshButton;
     private BroadcastReceiver mNotificationReceiver;
     private MainActivity mainActivity;
 
@@ -145,6 +144,15 @@ public class PassesFragment extends Fragment {
         ((RecyclerAdapter) mAdapter).removeItem(position);
     }
 
+    public void removeAll() {
+        mAdapterCasted.getmRecyclerList().clear();
+        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
+        stringList.clear();
+        MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,mainActivity);
+        mAdapter.notifyDataSetChanged();
+        Toast.makeText(mainActivity,"All captures deleted",Toast.LENGTH_SHORT).show();
+    }
+
     public void refreshJob() {
         JobScheduler mJobScheduler = (JobScheduler) mainActivity
                 .getSystemService(JOB_SCHEDULER_SERVICE);
@@ -158,6 +166,7 @@ public class PassesFragment extends Fragment {
         int resultCode = mJobScheduler.schedule(mJobBuilder.build());
         if(resultCode == JobScheduler.RESULT_SUCCESS){
             Log.d("Passes Fragment", "Refreshed successfully");
+            Toast.makeText(mainActivity,"Refreshed manually",Toast.LENGTH_SHORT).show();
         }
         else {
             Log.d("Passes Fragment", "Failed to refresh");
@@ -169,9 +178,9 @@ public class PassesFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         fragmentView = inflater.inflate(R.layout.fragment_passes, container, false);
 
-        mRecyclerView = fragmentView.findViewById(R.id.recyclerView);
-        refreshButton = fragmentView.findViewById(R.id.refreshButton);
+        setHasOptionsMenu(true);
 
+        mRecyclerView = fragmentView.findViewById(R.id.recyclerView);
         mRecyclerView.setHasFixedSize(true); //better performance
         mLayoutManager = new LinearLayoutManager(mainActivity);
         ((LinearLayoutManager) mLayoutManager).setReverseLayout(true);
@@ -193,13 +202,28 @@ public class PassesFragment extends Fragment {
             }
         }).attachToRecyclerView(mRecyclerView);
 
-        refreshButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                refreshJob();
-            }
-        });
-
         return fragmentView;
     }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.passes_menu, menu);
+        super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        int id = item.getItemId();
+
+        if(id == R.id.deleteAll) {
+            removeAll();
+        }
+        if(id == R.id.refreshButton) {
+            refreshJob();
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
 }

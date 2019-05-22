@@ -3,7 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/deleteAll"
-        android:title="Delete all passes"
-        android:icon="@drawable/ic_satellite"
+        android:title="Delete all"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/refreshButton"
+        android:title="Refresh"
+        android:icon="@drawable/ic_refresh"
         app:showAsAction="always"/>
 </menu>
