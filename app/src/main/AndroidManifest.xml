@@ -19,11 +19,10 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".Job"
-            android:label="TCP service"
-            android:permission="android.permission.BIND_JOB_SERVICE" >
-        </service>
+        <receiver
+            android:name=".AlarmReceiver"
+            android:process=":remote" >
+        </receiver>
     </application>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

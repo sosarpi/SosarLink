@@ -1,9 +1,12 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
@@ -51,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 new PassesFragment()).commit();
         navigationView.setCheckedItem(R.id.nav_passes);
 
-        initialJob(); //Schedule Jobs
+        scheduleAlarm(this); //Schedule Jobs
 
     }
 
@@ -60,30 +63,20 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onDestroy();
     }
 
-    public void initialJob() {
-        /*
-        ComponentName componentName = new ComponentName(this, Job.class);
-        JobInfo info = new JobInfo.Builder(1, componentName)
-                .setPersisted(true)            //Na reboot zal job nog altijd onthouden worden.
-                .setPeriodic(1 * 60 * 1000)    //Job iedere 30 minuten. Minimum mogelijk in te stellen is 15 minuten.
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-                .build();
-        */
+    public static void scheduleAlarm(Context ctx) {
+        Intent intent = new Intent(ctx, AlarmReceiver.class);
 
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(this, Job.class))
-                .setPersisted(true)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
+        final PendingIntent pIntent = PendingIntent.getBroadcast(ctx, AlarmReceiver.REQUEST_CODE,
+                intent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-        JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-        int resultCode = scheduler.schedule(mJobBuilder.build());
-        if (resultCode == JobScheduler.RESULT_SUCCESS) {
-            Log.d(TAG, "Initial job successfully scheduled");
-        } else {
-            Log.d(TAG, "Failed to schedule initial job");
-        }
+        long firstMillis = System.currentTimeMillis();
+        AlarmManager alarm = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        //alarm.cancel(pIntent);
+        alarm.setRepeating(AlarmManager.RTC_WAKEUP, firstMillis,
+                60000, pIntent);
+        Log.d("Alarm Manager", "Alarm scheduled");
     }
+
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {

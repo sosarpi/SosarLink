@@ -3,79 +3,31 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.job.JobInfo;
-import android.app.job.JobParameters;
-import android.app.job.JobScheduler;
-import android.app.job.JobService;
-import android.content.ComponentName;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.preference.PreferenceManager;
 import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
 
-public class Job extends JobService {
-    private static final String TAG = "Job";
-    private static final int INTERVAL = 5;
+public class AlarmReceiver extends BroadcastReceiver {
+    private static final String TAG = "AlarmReceiver";
+    public static final int REQUEST_CODE = 12345;
+    public static final String ACTION = "be.kuleuven.ee5.eliasstalpaert.sosarlink.alarm";
 
-    JobParameters mParams;
-
-    //onStartJob called when job launched
     @Override
-    public boolean onStartJob(JobParameters params) {
-        Log.d(TAG, "Job started");
-        this.mParams = params;
-        scheduleRefresh();
-        doBackGroundWork(params);
-
-        return true;
-    }
-
-    //Here our actual job work is done
-    private void doBackGroundWork(final JobParameters params) {
+    public void onReceive(final Context context, Intent intent) {
+        Log.d("AlarmReceiver", "Alarm received");
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new ConnectTask(getApplicationContext()).execute("");
-                Log.d(TAG, "AsyncTask started");
+                new AlarmReceiver.ConnectTask(context).execute("");
+                Log.d(TAG, "ConnectTask started");
             }
         }).start();
-    }
-
-    //onStopJob is called when Job failes/gets interrupted.
-
-    private void scheduleRefresh() {
-        JobScheduler mJobScheduler = (JobScheduler) getApplicationContext()
-                .getSystemService(JOB_SCHEDULER_SERVICE);
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(this,
-                                Job.class));
-        mJobBuilder
-                .setMinimumLatency(INTERVAL * 60 * 1000) //tijdsinterval
-                .setPersisted(true)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-
-        int resultCode = mJobScheduler.schedule(mJobBuilder.build());
-        if (resultCode == JobScheduler.RESULT_SUCCESS) {
-            Log.d(TAG, "Next job successfully scheduled");
-        } else {
-            Log.d(TAG, "Failed to schedule next job");
-        }
-    }
-
-    @Override
-    public boolean onStopJob(JobParameters params) {
-        Log.d(TAG, "Job cancelled before completion");
-        jobFinished(params, false);
-        return true;
     }
 
     protected class ConnectTask extends AsyncTask<String, String, TcpClient> {
@@ -109,10 +61,8 @@ public class Job extends JobService {
         @Override
         protected void onPostExecute(TcpClient tcpClient) {
             super.onPostExecute(tcpClient);
-            if (mParams != null) {
-                Log.d(TAG, "Job finished");
-                jobFinished(mParams, false);
-            }
+            Log.d(TAG, "Alarm finished");
+
         }
 
         @Override
@@ -153,7 +103,7 @@ public class Job extends JobService {
             } else if(values[0].contains("no")) {
                 if(captureReceived) {
                     Intent new_satellite = new Intent("SATELLITE");
-                    sendBroadcast(new_satellite);
+                    mContext.sendBroadcast(new_satellite);
                     captureReceived = false;
                 }
                 number = 0;
@@ -210,7 +160,7 @@ public class Job extends JobService {
         }
 
         public void updateSharedPreferences(String pref_message) {
-            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,getApplicationContext());
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mContext);
             if (stringList == null) {
                 stringList = new ArrayList<>();
             }
@@ -226,7 +176,7 @@ public class Job extends JobService {
                 stringList.add(pref_message);
                 Log.d(TAG, "New string added to sharedpreferences");
             }
-            MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,getApplicationContext());
+            MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,mContext);
         }
     }
 }

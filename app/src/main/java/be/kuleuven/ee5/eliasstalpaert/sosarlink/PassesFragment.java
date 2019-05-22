@@ -1,5 +1,7 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.BroadcastReceiver;
@@ -153,26 +155,6 @@ public class PassesFragment extends Fragment {
         Toast.makeText(mainActivity,"All captures deleted",Toast.LENGTH_SHORT).show();
     }
 
-    public void refreshJob() {
-        JobScheduler mJobScheduler = (JobScheduler) mainActivity
-                .getSystemService(JOB_SCHEDULER_SERVICE);
-        mJobScheduler.cancelAll();
-
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(mainActivity, Job.class))
-                        .setPersisted(true)
-                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-        int resultCode = mJobScheduler.schedule(mJobBuilder.build());
-        if(resultCode == JobScheduler.RESULT_SUCCESS){
-            Log.d("Passes Fragment", "Refreshed successfully");
-            Toast.makeText(mainActivity,"Refreshed manually",Toast.LENGTH_SHORT).show();
-        }
-        else {
-            Log.d("Passes Fragment", "Failed to refresh");
-        }
-    }
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -220,7 +202,8 @@ public class PassesFragment extends Fragment {
             removeAll();
         }
         if(id == R.id.refreshButton) {
-            refreshJob();
+            MainActivity.scheduleAlarm(mainActivity);
+            Toast.makeText(mainActivity, "Refreshed manually", Toast.LENGTH_SHORT).show();
         }
 
         return super.onOptionsItemSelected(item);
