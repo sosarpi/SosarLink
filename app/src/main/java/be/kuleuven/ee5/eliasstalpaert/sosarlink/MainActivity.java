@@ -2,14 +2,9 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.DhcpInfo;
-import android.net.Uri;
-import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
@@ -20,23 +15,20 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import java.util.HashSet;
-import java.util.Iterator;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = "MainActivity";
+    public static final String LIST_NAME = "satellite";
 
     private DrawerLayout drawer;
-    private SharedPreferences.Editor editor;
-    private SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,29 +51,37 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 new PassesFragment()).commit();
         navigationView.setCheckedItem(R.id.nav_passes);
 
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        editor=sharedPreferences.edit();
-        editor.clear();
-        editor.apply();
-
-        scheduleJobs(); //Schedule Jobs
+        initialJob(); //Schedule Jobs
 
     }
 
-    public void scheduleJobs() {
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    }
+
+    public void initialJob() {
+        /*
         ComponentName componentName = new ComponentName(this, Job.class);
         JobInfo info = new JobInfo.Builder(1, componentName)
                 .setPersisted(true)            //Na reboot zal job nog altijd onthouden worden.
                 .setPeriodic(1 * 60 * 1000)    //Job iedere 30 minuten. Minimum mogelijk in te stellen is 15 minuten.
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
                 .build();
+        */
+
+        JobInfo.Builder mJobBuilder =
+                new JobInfo.Builder(1,
+                        new ComponentName(this, Job.class))
+                .setPersisted(true)
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
 
         JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-        int resultCode = scheduler.schedule(info);
+        int resultCode = scheduler.schedule(mJobBuilder.build());
         if (resultCode == JobScheduler.RESULT_SUCCESS) {
-            Log.d(TAG, "Periodically checking scheduled");
+            Log.d(TAG, "Initial job successfully scheduled");
         } else {
-            Log.d(TAG, "Scheduling periodically checking failed");
+            Log.d(TAG, "Failed to schedule initial job");
         }
     }
 
@@ -101,11 +101,30 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return true;
     }
 
+    public static void saveArrayList(ArrayList<String> list, String key, Context context){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor editor = prefs.edit();
+        Gson gson = new Gson();
+        String json = gson.toJson(list);
+        editor.putString(key, json);
+        editor.apply();     // This line is IMPORTANT !!!
+        Log.d("Static", "ArrayList saved");
+    }
+
+    public static ArrayList<String> getArrayList(String key, Context context){
+        Log.d("Static", "Trying to receive ArrayList");
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        Gson gson = new Gson();
+        String json = prefs.getString(key, null);
+        Type type = new TypeToken<ArrayList<String>>() {}.getType();
+        return gson.fromJson(json, type);
+    }
+
     @Override
     public void onBackPressed() {
-        if(drawer.isDrawerOpen(GravityCompat.START)) {
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
-        } else{
+        } else {
             super.onBackPressed();
         }
     }

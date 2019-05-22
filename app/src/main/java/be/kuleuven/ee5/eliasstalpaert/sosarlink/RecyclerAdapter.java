@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import java.util.ArrayList;
 
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.RecyclerViewHolder> {
@@ -47,13 +48,17 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
         int image_resource;
 
         String satellite_name = currentItem.getText1();
-        switch(satellite_name) {
-            case "NOAA19":
-                satellite_name = "NOAA-19";
+        switch (satellite_name) {
+            case "NOAA15":
+                satellite_name = "NOAA-15";
                 image_resource = R.mipmap.ic_launcher;
                 break;
             case "NOAA18":
                 satellite_name = "NOAA-18";
+                image_resource = R.mipmap.ic_launcher;
+                break;
+            case "NOAA19":
+                satellite_name = "NOAA-19";
                 image_resource = R.mipmap.ic_launcher;
                 break;
             case "METEOR":
@@ -70,12 +75,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
 
         recyclerViewHolder.mTextView1.setText(satellite_name);
         String concatTimeDate = currentItem.getText2();
-        String hours = concatTimeDate.substring(0,2);
-        String minutes = concatTimeDate.substring(2,4);
-        String seconds = concatTimeDate.substring(4,6);
-        String day = concatTimeDate.substring(6,8);
-        String month = concatTimeDate.substring(8,10);
-        String year = concatTimeDate.substring(10,12);
+        String hours = concatTimeDate.substring(0, 2);
+        String minutes = concatTimeDate.substring(2, 4);
+        String seconds = concatTimeDate.substring(4, 6);
+        String day = concatTimeDate.substring(6, 8);
+        String month = concatTimeDate.substring(8, 10);
+        String year = concatTimeDate.substring(10, 12);
         recyclerViewHolder.mTextView2.setText(hours + ":" + minutes + ":" + seconds + "\t" + day + "/" + month + "/" + year);
     }
 
@@ -87,5 +92,9 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
     @Override
     public int getItemCount() {
         return mRecyclerList.size();
+    }
+
+    public ArrayList<RecyclerItem> getmRecyclerList() {
+        return mRecyclerList;
     }
 }

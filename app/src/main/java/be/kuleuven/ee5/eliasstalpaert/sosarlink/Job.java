@@ -3,8 +3,11 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.job.JobInfo;
 import android.app.job.JobParameters;
+import android.app.job.JobScheduler;
 import android.app.job.JobService;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -13,30 +16,23 @@ import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Set;
-
-import javax.xml.transform.Result;
 
 public class Job extends JobService {
     private static final String TAG = "Job";
+    private static final int INTERVAL = 5;
 
     JobParameters mParams;
-    SharedPreferences.Editor editor;
-    SharedPreferences sharedPreferences;
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        editor= sharedPreferences.edit();
-    }
 
     //onStartJob called when job launched
     @Override
     public boolean onStartJob(JobParameters params) {
         Log.d(TAG, "Job started");
         this.mParams = params;
+        scheduleRefresh();
         doBackGroundWork(params);
 
         return true;
@@ -54,11 +50,31 @@ public class Job extends JobService {
     }
 
     //onStopJob is called when Job failes/gets interrupted.
+
+    private void scheduleRefresh() {
+        JobScheduler mJobScheduler = (JobScheduler) getApplicationContext()
+                .getSystemService(JOB_SCHEDULER_SERVICE);
+        JobInfo.Builder mJobBuilder =
+                new JobInfo.Builder(1,
+                        new ComponentName(this,
+                                Job.class));
+        mJobBuilder
+                .setMinimumLatency(INTERVAL * 60 * 1000) //tijdsinterval
+                .setPersisted(true)
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
+
+        int resultCode = mJobScheduler.schedule(mJobBuilder.build());
+        if (resultCode == JobScheduler.RESULT_SUCCESS) {
+            Log.d(TAG, "Next job successfully scheduled");
+        } else {
+            Log.d(TAG, "Failed to schedule next job");
+        }
+    }
+
     @Override
     public boolean onStopJob(JobParameters params) {
         Log.d(TAG, "Job cancelled before completion");
         jobFinished(params, false);
-        //jobCancelled = true;
         return true;
     }
 
@@ -70,13 +86,15 @@ public class Job extends JobService {
         int number;
         String name, time, date;
         int notifyID;
+        boolean captureReceived;
 
         ConnectTask(Context mContext) {
             super();
             this.mContext = mContext;
             this.notifyID = 0;
+            this.captureReceived = false;
 
-            NM=(NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            NM = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 String CHANNEL_ID = "my_channel_01";// The id of the channel.
@@ -91,7 +109,7 @@ public class Job extends JobService {
         @Override
         protected void onPostExecute(TcpClient tcpClient) {
             super.onPostExecute(tcpClient);
-            if(mParams != null) {
+            if (mParams != null) {
                 Log.d(TAG, "Job finished");
                 jobFinished(mParams, false);
             }
@@ -118,47 +136,53 @@ public class Job extends JobService {
         @Override
         protected void onProgressUpdate(String... values) {
             super.onProgressUpdate(values);
-            //response received from server
-            Log.d("test", "response " + values[0]);
             //process server response here....
-            if(values[0].contains("yes")) {
+            if (values[0].contains("yes")) {
                 number = 0;
-            }
-            else if(!values[0].contains("no")){
-                if(number == 0) {
+            } else if (!values[0].contains("no")) {
+                if (number == 0) {
                     name = new String(values[0]);
                     number++;
-                }
-                else if(number == 1) {
+                } else if (number == 1) {
                     time = new String(values[0]);
                     number++;
-                }
-                else if(number == 2) {
+                } else if (number == 2) {
                     date = new String(values[0]);
                     number++;
                 }
-            }
-            else{
+            } else if(values[0].contains("no")) {
+                if(captureReceived) {
+                    Intent new_satellite = new Intent("SATELLITE");
+                    sendBroadcast(new_satellite);
+                    captureReceived = false;
+                }
                 number = 0;
             }
-            if(number >= 3) {
+            if (number >= 3) {
                 String pref_message = name + time + date;
                 updateSharedPreferences(pref_message); //write to shared application preferences
-
-                switch(name) {
-                    case "NOAA19":
-                        name = "NOAA-19";
+                switch (name) {
+                    case "NOAA15":
+                        name = "NOAA-15";
                         break;
                     case "NOAA18":
                         name = "NOAA-18";
                         break;
+                    case "NOAA19":
+                        name = "NOAA-19";
+                        break;
                     case "METEOR":
                         name = "METEOR-M N2";
+                        break;
+                    default:
+                        name = "ERROR";
                 }
 
-                String nMessage = name + " at " + time.substring(0,2) + ":" + time.substring(2,4) + ":" + time.substring(4,6)
-                        + " on " + date.substring(0,2) + "/" + date.substring(2,4) + "/" + date.substring(4,6);
+                Log.d("ConnectTask","New capture");
+                String nMessage = name + " at " + time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + time.substring(4, 6)
+                        + " on " + date.substring(0, 2) + "/" + date.substring(2, 4) + "/" + date.substring(4, 6);
                 pushNotification(nMessage); //push notifications to user
+                captureReceived = true;
                 number = 0;
             }
 
@@ -173,9 +197,8 @@ public class Job extends JobService {
                         .setSmallIcon(R.drawable.ic_launcher_foreground)
                         .setChannelId(mChannel.getId())
                         .build();
-                NM.notify(notifyID,n);
-            }
-            else{
+                NM.notify(notifyID, n);
+            } else {
                 Notification n = new Notification.Builder(mContext)
                         .setContentTitle("New weather satellite picture!")
                         .setContentText(nMessage)
@@ -187,19 +210,23 @@ public class Job extends JobService {
         }
 
         public void updateSharedPreferences(String pref_message) {
-            if(editor != null) {
-                Set<String> stringSet = sharedPreferences.getStringSet("passes", null);
-                if(stringSet == null) {
-                    stringSet = new HashSet<>();
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,getApplicationContext());
+            if (stringList == null) {
+                stringList = new ArrayList<>();
+            }
+            Iterator<String> iterator = stringList.iterator();
+            boolean found = false;
+            while(iterator.hasNext() && !found) {
+                String next = iterator.next();
+                if(next.equals(pref_message)) {
+                    found = true;
                 }
-                stringSet.add(pref_message);
-                editor.putStringSet("passes", stringSet);
-                editor.apply();
+            }
+            if(!found) {
+                stringList.add(pref_message);
                 Log.d(TAG, "New string added to sharedpreferences");
             }
-            else {
-                Log.d(TAG, "Error: Sharedpreferences editor is null");
-            }
+            MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,getApplicationContext());
         }
     }
 }

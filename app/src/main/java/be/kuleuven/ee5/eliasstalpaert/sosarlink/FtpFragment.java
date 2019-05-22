@@ -15,7 +15,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Toast;
 
 public class FtpFragment extends Fragment {
 
@@ -25,7 +24,7 @@ public class FtpFragment extends Fragment {
 
 
     @Override
-    public void onCreate(Bundle savedInstanceState){
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getActivity().setTitle("FTP");
     }
@@ -68,8 +67,8 @@ public class FtpFragment extends Fragment {
         intent.setAction(Intent.ACTION_VIEW);
         String link = "ftp://" + ftpIp.getText().toString();
         intent.setData(Uri.parse(link));
-        intent.putExtra("ftp_username",ftpUsername.getText().toString());
-        intent.putExtra("ftp_password",ftpPassword.getText().toString());
+        intent.putExtra("ftp_username", ftpUsername.getText().toString());
+        intent.putExtra("ftp_password", ftpPassword.getText().toString());
         startActivity(intent);
     }
 
