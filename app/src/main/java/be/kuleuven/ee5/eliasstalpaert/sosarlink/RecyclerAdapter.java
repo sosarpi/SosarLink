@@ -13,6 +13,15 @@ import java.util.ArrayList;
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.RecyclerViewHolder> {
 
     private ArrayList<RecyclerItem> mRecyclerList;
+    private OnItemClickListener mListener;
+
+    public interface OnItemClickListener {
+        void onItemClick(int position);
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener){
+        mListener = listener;
+    }
 
     public static class RecyclerViewHolder extends RecyclerView.ViewHolder {
 
@@ -20,11 +29,23 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
         public TextView mTextView1;
         public TextView mTextView2;
 
-        public RecyclerViewHolder(View itemView) {
+        public RecyclerViewHolder(View itemView, final OnItemClickListener listener) {
             super(itemView);
             mImageView = itemView.findViewById(R.id.imageViewRecycler);
             mTextView1 = itemView.findViewById(R.id.textViewRecycler);
             mTextView2 = itemView.findViewById(R.id.textViewRecycler2);
+
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if(listener != null) {
+                        int position = getAdapterPosition();
+                        if(position != RecyclerView.NO_POSITION) {
+                            listener.onItemClick(position);
+                        }
+                    }
+                }
+            });
         }
 
     }
@@ -37,7 +58,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
     @Override
     public RecyclerViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
         View v = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.example_item, viewGroup, false);
-        RecyclerViewHolder rvh = new RecyclerViewHolder(v);
+        RecyclerViewHolder rvh = new RecyclerViewHolder(v, mListener);
         return rvh;
     }
 
@@ -51,23 +72,23 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
         switch (satellite_name) {
             case "NOAA15":
                 satellite_name = "NOAA-15";
-                image_resource = R.mipmap.ic_launcher;
+                image_resource = R.drawable.noaa_iconv2;
                 break;
             case "NOAA18":
                 satellite_name = "NOAA-18";
-                image_resource = R.mipmap.ic_launcher;
+                image_resource = R.drawable.noaa_iconv2;
                 break;
             case "NOAA19":
                 satellite_name = "NOAA-19";
-                image_resource = R.mipmap.ic_launcher;
+                image_resource = R.drawable.noaa_iconv2;
                 break;
             case "METEOR":
                 satellite_name = "METEOR-M N2";
-                image_resource = R.mipmap.ic_launcher;
+                image_resource = R.drawable.meteorv4;
                 break;
             default:
                 satellite_name = "ERROR";
-                image_resource = R.mipmap.ic_launcher;
+                image_resource = R.mipmap.ic_sosarlogo;
                 break;
         }
 

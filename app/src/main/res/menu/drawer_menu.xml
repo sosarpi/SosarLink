@@ -7,7 +7,7 @@
         <item
             android:id="@+id/nav_ftp"
             android:icon="@drawable/ic_ftp"
-            android:title="Access FTP" />
+            android:title="FTP Settings" />
 
         <item
             android:id="@+id/nav_passes"

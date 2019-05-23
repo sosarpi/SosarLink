@@ -160,28 +160,30 @@ public class Job extends JobService {
             }
             if (number >= 3) {
                 String pref_message = name + time + date;
-                updateSharedPreferences(pref_message); //write to shared application preferences
-                switch (name) {
-                    case "NOAA15":
-                        name = "NOAA-15";
-                        break;
-                    case "NOAA18":
-                        name = "NOAA-18";
-                        break;
-                    case "NOAA19":
-                        name = "NOAA-19";
-                        break;
-                    case "METEOR":
-                        name = "METEOR-M N2";
-                        break;
-                    default:
-                        name = "ERROR";
-                }
+                if (pref_message.length() >= 18) { //correcte format?
+                    updateSharedPreferences(pref_message); //write to shared application preferences
+                    switch (name) {
+                        case "NOAA15":
+                            name = "NOAA-15";
+                            break;
+                        case "NOAA18":
+                            name = "NOAA-18";
+                            break;
+                        case "NOAA19":
+                            name = "NOAA-19";
+                            break;
+                        case "METEOR":
+                            name = "METEOR-M N2";
+                            break;
+                        default:
+                            name = "ERROR";
+                    }
 
-                Log.d("ConnectTask","New capture");
-                String nMessage = name + " at " + time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + time.substring(4, 6)
-                        + " on " + date.substring(0, 2) + "/" + date.substring(2, 4) + "/" + date.substring(4, 6);
-                pushNotification(nMessage); //push notifications to user
+                    Log.d("ConnectTask","New capture");
+                    String nMessage = name + " at " + time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + time.substring(4, 6)
+                            + " on " + date.substring(0, 2) + "/" + date.substring(2, 4) + "/" + date.substring(4, 6);
+                    pushNotification(nMessage); //push notifications to user
+                }
                 captureReceived = true;
                 number = 0;
             }

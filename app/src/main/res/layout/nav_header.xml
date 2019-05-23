@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="160dp"
-    android:background="@color/colorAccent"
+    android:background="@drawable/headerspace"
     android:gravity="bottom"
     android:orientation="vertical"
     android:padding="16dp"
@@ -12,35 +12,18 @@
 
     <ImageView
         android:id="@+id/image"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="246dp"
+        android:layout_height="146dp"
 
+        android:layout_marginStart="70dp"
         android:layout_marginTop="8dp"
-        android:layout_marginEnd="160dp"
+        android:layout_marginEnd="252dp"
         android:layout_marginBottom="8dp"
-        android:src="@mipmap/ic_launcher_round"
+        android:src="@drawable/sosarv3"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintHorizontal_bias="0.224"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="16dp"
-        android:layout_toRightOf="@id/image"
-        android:paddingTop="8dp"
-        android:text="SosarLink"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textSize="28sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toEndOf="@+id/image"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.503" />
 
 </android.support.constraint.ConstraintLayout>

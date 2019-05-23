@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 
 import com.google.gson.Gson;
@@ -29,17 +30,22 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public static final String LIST_NAME = "satellite";
 
     private DrawerLayout drawer;
+    private NavigationView mNavigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
+        editor.clear();
+        editor.apply();
+
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        NavigationView navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
+        mNavigationView = findViewById(R.id.nav_view);
+        mNavigationView.setNavigationItemSelectedListener(this);
 
         drawer = findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar,
@@ -49,10 +55,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
                 new PassesFragment()).commit();
-        navigationView.setCheckedItem(R.id.nav_passes);
+        mNavigationView.setCheckedItem(R.id.nav_passes);
 
         initialJob(); //Schedule Jobs
 
+    }
+
+    public NavigationView getmNavigationView() {
+        return mNavigationView;
     }
 
     @Override
