@@ -37,9 +37,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
-        editor.clear();
-        editor.apply();
+        //SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
+        //editor.clear();
+        //editor.apply();
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);

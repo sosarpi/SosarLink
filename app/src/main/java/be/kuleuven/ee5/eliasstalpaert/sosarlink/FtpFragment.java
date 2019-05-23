@@ -65,7 +65,7 @@ public class FtpFragment extends Fragment {
             @Override
             public void onClick(View view) {
                 updateFtpSettings();
-                Toast.makeText(mainActivity,"FTP Settings updated",Toast.LENGTH_SHORT);
+                Toast.makeText(mainActivity,"FTP Settings updated",Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -78,6 +78,7 @@ public class FtpFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         mainActivity = (MainActivity) getActivity();
         mainActivity.setTitle("FTP");
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
@@ -122,45 +123,6 @@ public class FtpFragment extends Fragment {
         editor.putString(FTPPASS_KEY, password);
         editor.putString(FTPIP_KEY, ip_address);
         editor.apply();
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode,resultCode,data);
-
-        switch (requestCode) {
-            case REQUEST_DIRECTORY:
-
-                    //String chosen_dir = data.getStringExtra(DirectoryChooserActivity.RESULT_SELECTED_DIR);
-                    Uri uri = data.getData();
-                    String chosen_dir = getRealPathFromURI(mainActivity,uri);//assign it to a string(your choice).
-                    Log.d("DirChoose", "Directory chosen: " + chosen_dir);
-                    SharedPreferences.Editor editor = sharedPreferences.edit();
-                    editor.putString(FtpFragment.LOCALDIR_KEY, chosen_dir);
-                    editor.apply();
-                break;
-            default:
-                break;
-        }
-
-    }
-
-    private String getRealPathFromURI(Context context, Uri contentUri) {
-        Cursor cursor = null;
-        try {
-            String[] proj = { MediaStore.Images.Media.DATA };
-            cursor = context.getContentResolver().query(contentUri,  proj, null, null, null);
-            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-            cursor.moveToFirst();
-            return cursor.getString(column_index);
-        } catch (Exception e) {
-            Log.e("ERROR", "getRealPathFromURI Exception : " + e.toString());
-            return "";
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
     }
 
     public void changeDefaultSaveDir() {
@@ -234,11 +196,11 @@ public class FtpFragment extends Fragment {
             Toast.makeText(mainActivity, "Set a default save directory first", Toast.LENGTH_LONG).show();
         }
         else {
-            getImageFromFtp(localDir);
+            getImageFromRecyclerItem(localDir);
         }
     }
     /*
-    public void getImageFromFtp(String dir) {
+    public void getImageFromRecyclerItem(String dir) {
         Intent intent = new Intent();
         intent.setAction(Intent.ACTION_PICK);
         Uri ftpUri = Uri.parse("ftp://" + ftpIp.getText().toString());

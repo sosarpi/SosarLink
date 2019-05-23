@@ -13,7 +13,6 @@ import android.net.DhcpInfo;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -36,7 +35,6 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -75,6 +73,7 @@ public class PassesFragment extends Fragment {
         super.onCreate(savedInstanceState);
 
         this.setHasOptionsMenu(true);
+
         mainActivity = (MainActivity) getActivity();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
         mainActivity.setTitle("Captures");
@@ -114,7 +113,7 @@ public class PassesFragment extends Fragment {
         mAdapter.setOnItemClickListener(new RecyclerAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(int position) {
-                getImageFromFtp(mRecyclerList.get(position));
+                getImageFromRecyclerItem(mRecyclerList.get(position));
             }
         });
 
@@ -131,11 +130,13 @@ public class PassesFragment extends Fragment {
         }).attachToRecyclerView(mRecyclerView);
     }
 
-    public void getImageFromFtp(RecyclerItem recyclerItem) {
+    public void getImageFromRecyclerItem(RecyclerItem recyclerItem) {
         String ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
         String ftpUsername = sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null);
         String ftpPassword = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
         String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null);
+
+
 
         if(ftpIp == null) {
             setDefaultIP(mainActivity);
@@ -145,9 +146,7 @@ public class PassesFragment extends Fragment {
             firstTimeFtpCredentials();
         }
         else if(isLocalDirValid(localDir)) {
-
             String image_name = getImageNameFromCapture(recyclerItem);
-
             this.setImageToBeOpened(image_name);
 
             File file = new File(localDir + File.separator + image_name);
@@ -175,9 +174,12 @@ public class PassesFragment extends Fragment {
 
     public boolean isLocalDirValid(String localDir){
         if(localDir == null){
+
+            FtpFragment ftpFragment = new FtpFragment();
+
             mainActivity.getmNavigationView().setCheckedItem(R.id.nav_ftp);
             mainActivity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                    new FtpFragment()).commit();
+                    ftpFragment).commit();
             return false;
         }
         return true;
@@ -447,6 +449,9 @@ public class PassesFragment extends Fragment {
                     if(localDir != null){
                         viewFile(this.getImageToBeOpened(), localDir);
                     }
+                }
+                else if (status.equals("FAILED")){
+                    Toast.makeText(mainActivity, "Download failed",Toast.LENGTH_SHORT).show();
                 }
             }
         }
