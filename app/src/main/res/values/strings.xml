@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">SosarLink</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="ftp_username_prompt">Please enter FTP username</string>
+    <string name="username_hint">Username</string>
+    <string name="password_hint">Password</string>
+    <string name="submit">Submit</string>
+    <string name="cancel">Cancel</string>
+    <string name="ftp_password_prompt">Please enter FTP password</string>
 </resources>
