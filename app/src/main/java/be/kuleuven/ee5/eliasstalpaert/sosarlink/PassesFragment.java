@@ -12,6 +12,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.DhcpInfo;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.preference.PreferenceManager;
@@ -31,9 +32,13 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import com.adeel.library.easyFTP;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -43,8 +48,10 @@ import static android.content.Context.JOB_SCHEDULER_SERVICE;
 
 public class PassesFragment extends Fragment {
 
-    private static final int DOWNLOAD_FILES_REQUEST = 0;
     private static final String TAG = PassesFragment.class.getSimpleName();
+    private static boolean prompt_displayed = false;
+    public static final String JOB_INTERVAL_KEY = "jobinterval";
+    public static final String JOB_ENABLE_KEY = "jobenable";
 
 
     private RecyclerView mRecyclerView;
@@ -56,9 +63,6 @@ public class PassesFragment extends Fragment {
     private ArrayList<RecyclerItem> mRecyclerList;
     private SharedPreferences sharedPreferences;
 
-    private String imageToBeOpened;
-    private Boolean callback;
-
     private View fragmentView;
 
     @Nullable
@@ -66,13 +70,13 @@ public class PassesFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         fragmentView = inflater.inflate(R.layout.fragment_passes, container, false);
         mRecyclerView = fragmentView.findViewById(R.id.recyclerView);
-        imageToBeOpened = null;
         buildRecyclerView();
 
         return fragmentView;
     }
 
     public void promptForIp() {
+        prompt_displayed = true;
         final SharedPreferences.Editor editor = sharedPreferences.edit();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
@@ -94,6 +98,7 @@ public class PassesFragment extends Fragment {
                 editor.apply();
                 Toast.makeText(mainActivity, "IP set manually to: " + ip, Toast.LENGTH_SHORT).show();
                 alertDialog.dismiss();
+                prompt_displayed = false;
                 refreshJob();
             }
         });
@@ -105,6 +110,7 @@ public class PassesFragment extends Fragment {
                 editor.apply();
                 Toast.makeText(mainActivity, "IP set to: " + gatewayIp, Toast.LENGTH_SHORT).show();
                 alertDialog.dismiss();
+                prompt_displayed = false;
                 refreshJob();
             }
         });
@@ -133,16 +139,16 @@ public class PassesFragment extends Fragment {
 
     public boolean refreshJob() {
         String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
-        if(ip == null) {
+        if (ip == null) {
+            Log.d(TAG, "ip is null af (refreshJob)");
             promptForIp();
             return false;
-        }
-        else{
+        } else {
             JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
             mJobScheduler.cancelAll();
 
             PersistableBundle extras = new PersistableBundle();
-            extras.putString(FtpFragment.FTPIP_KEY,ip);
+            extras.putString(FtpFragment.FTPIP_KEY, ip);
 
             JobInfo.Builder mJobBuilder =
                     new JobInfo.Builder(1,
@@ -165,12 +171,13 @@ public class PassesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        if(sharedPreferences.getString(FtpFragment.FTPIP_KEY, null) == null) {
-            promptForIp();
-        }
-
         mainActivity.registerReceiver(mNotificationReceiver, new IntentFilter("SATELLITE"));
         updateRecyclerView();
+
+        if (sharedPreferences.getString(FtpFragment.FTPIP_KEY, null) == null) {
+            Log.d(TAG, "ip is null af (resume)");
+            if(!prompt_displayed) promptForIp();
+        }
     }
 
     @Override
@@ -204,7 +211,7 @@ public class PassesFragment extends Fragment {
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int i) {
-                removeRecyclerItems(viewHolder.getAdapterPosition());
+                removeRecyclerItem(viewHolder.getAdapterPosition());
             }
         }).attachToRecyclerView(mRecyclerView);
     }
@@ -213,59 +220,25 @@ public class PassesFragment extends Fragment {
         String ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
         String ftpUsername = sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null);
         String ftpPassword = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
-        String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null);
 
-
-
-        if(ftpIp == null) {
+        if (ftpIp == null) {
             promptForIp();
-            ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
         }
-        if(ftpPassword == null || ftpUsername == null) {
+        if (ftpPassword == null || ftpUsername == null) {
             firstTimeFtpCredentials();
-        }
-        else if(isLocalDirValid()) {
+        } else {
             String image_name = getImageNameFromCapture(recyclerItem);
-            this.setImageToBeOpened(image_name);
+            TextView textView = new TextView(mainActivity);
+            textView.setText(image_name);
+            AlertDialog alertDialog = new AlertDialog.Builder(mainActivity)
+                    .setTitle("Downloading...")
+                    .setView(textView)
+                    .setCancelable(false)
+                    .create();
+            alertDialog.show();
 
-            File file = new File(localDir + File.separator + image_name);
-            if(file.exists()){
-                viewFile(image_name,localDir);
-            }
-            else{
-                Intent intent = new Intent();
-                intent.setAction(Intent.ACTION_PICK);
-                Uri ftpUri = Uri.parse("ftp://" + ftpIp);
-                intent.setDataAndType(ftpUri, "vnd.android.cursor.dir/lysesoft.andftp.uri");
-                intent.putExtra("command_type", "download");
-                intent.putExtra("ftp_username", ftpUsername);
-                intent.putExtra("ftp_password", ftpPassword);
-                intent.putExtra("ftp_overwrite","skip");
-                intent.putExtra("progress_title", "Downloading picture...");
-                intent.putExtra("remote_file1", "/files/" + image_name);
-                intent.putExtra("local_folder", localDir);
-                intent.putExtra("close_ui", "true");
-                intent.setFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                startActivityForResult(intent, DOWNLOAD_FILES_REQUEST);
-            }
+            new DownloadTask(image_name, alertDialog).execute();
         }
-    }
-
-    public boolean isLocalDirValid(){
-        String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY,null);
-        if(localDir == null){
-
-            FtpFragment ftpFragment = new FtpFragment();
-            Bundle args = new Bundle();
-            args.putBoolean("callback",true);
-            ftpFragment.setArguments(args);
-
-            mainActivity.getmNavigationView().setCheckedItem(R.id.nav_ftp);
-            mainActivity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                    ftpFragment).commit();
-            return false;
-        }
-        return true;
     }
 
     public static String getGatewayIp(Context context) {
@@ -273,7 +246,7 @@ public class PassesFragment extends Fragment {
         DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
 
         String gatewayIP = formatIP(dhcpInfo.gateway);
-        return  gatewayIP;
+        return gatewayIP;
     }
 
     public static String formatIP(int ip) {
@@ -286,7 +259,7 @@ public class PassesFragment extends Fragment {
         );
     }
 
-    public void firstTimeFtpCredentials(){
+    public void firstTimeFtpCredentials() {
         final SharedPreferences.Editor editor = sharedPreferences.edit();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
@@ -309,7 +282,6 @@ public class PassesFragment extends Fragment {
                 editor.apply();
                 Toast.makeText(mainActivity, "Credentials submitted", Toast.LENGTH_SHORT).show();
                 alertDialog.dismiss();
-                isLocalDirValid();
             }
         });
         cancel.setOnClickListener(new View.OnClickListener() {
@@ -322,9 +294,7 @@ public class PassesFragment extends Fragment {
 
     public void updateRecyclerView() {
 
-        Log.d(TAG, "Updating UI");
-
-        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
+        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
         if (stringList != null) {
             Log.d(TAG, "Stringlist found");
             Iterator<String> iterator = stringList.iterator();
@@ -345,19 +315,19 @@ public class PassesFragment extends Fragment {
         String concatTimeDate = s.substring(6, 18);
         Iterator<RecyclerItem> itemIterator = mRecyclerList.iterator();
         boolean found = false;
-        while(itemIterator.hasNext() && found == false) {
+        while (itemIterator.hasNext() && found == false) {
             RecyclerItem next = itemIterator.next();
-            if(next.getText1().equals(satellite_name) && next.getText2().equals(concatTimeDate)) {
+            if (next.getText1().equals(satellite_name) && next.getText2().equals(concatTimeDate)) {
                 found = true;
             }
         }
-        if(found == false) {
+        if (found == false) {
             mRecyclerView.smoothScrollToPosition(0);
             mRecyclerList.add(new RecyclerItem(0, satellite_name, concatTimeDate));
         }
     }
 
-    public String getImageNameFromCapture(RecyclerItem capture){
+    public String getImageNameFromCapture(RecyclerItem capture) {
         String image_name = "error.jpg";
         String satelliteName = capture.getText1();
         String concatTimeDate = capture.getText2();
@@ -368,21 +338,20 @@ public class PassesFragment extends Fragment {
         String month = concatTimeDate.substring(8, 10);
         String day = concatTimeDate.substring(10, 12);
 
-        if(satelliteName.contains("NOAA")){
+        if (satelliteName.contains("NOAA")) {
             image_name = satelliteName + "20" + year + month + day + "-" + hours + minutes + seconds + ".png";
-        }
-        else if(satelliteName.contains("METEOR")){
+        } else if (satelliteName.contains("METEOR")) {
             image_name = "METEOR-M220" + year + month + day + "-" + hours + minutes + seconds + ".png";
         }
 
         return image_name;
     }
 
-    public void removeRecyclerItems(int position) {
-        RecyclerItem toBeRemoved_item = mRecyclerList.get(position);
-        if (toBeRemoved_item != null) {
-            String toBeRemoved_string = toBeRemoved_item.getText1() + toBeRemoved_item.getText2();
-            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
+    public void removeRecyclerItem(int position) {
+        RecyclerItem recyclerItem = mRecyclerList.get(position);
+        if (recyclerItem != null) {
+            String toBeRemoved_string = recyclerItem.getText1() + recyclerItem.getText2();
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
             if (stringList != null) {
                 Iterator<String> iterator = stringList.iterator();
                 boolean found = false;
@@ -391,7 +360,7 @@ public class PassesFragment extends Fragment {
                     if (next.equals(toBeRemoved_string)) {
                         iterator.remove();
                         found = true;
-                        MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,mainActivity);
+                        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
                         Log.d(TAG, "Element removed from SharedPreferences");
                     }
                 }
@@ -402,61 +371,91 @@ public class PassesFragment extends Fragment {
                 Log.d(TAG, "Stringlist not found");
             }
 
-
-            /*
-            String image_name = getImageNameFromCapture(toBeRemoved_item);
-            String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null);
-            if(localDir != null){
-                String filepath = localDir + File.separator + image_name;
-                int rows_deleted = mainActivity.getContentResolver().delete(FileProvider.getUriForFile(mainActivity,BuildConfig.APPLICATION_ID + ".provider",new File(filepath)),null,null);
-                File file = new File(filepath);
-                try{
-                    if(file.exists()){
-                        Log.d("ImageDeleter", "Trying to delete: " + filepath + "   " + rows_deleted);
-                        boolean deleted = file.getCanonicalFile().delete();
-                        if(deleted){
-                            Log.d("ImageDeleter", "Image successfully deleted");
-                        }
-                        else{
-                            Log.d("ImageDeleter", "Failed to delete image");
-                        }
-                    }
-                    else{
-                        Log.d("ImageDeleter", "File not found");
-                    }
-                }
-                catch (Exception e){
-                    if(e instanceof IOException){
-                        Log.d("IOException", "File to be deleted not found");
-                    }
-                }
-
-            }
-            */
+            String image_name = getImageNameFromCapture(recyclerItem);
+            removeImageFromCache(image_name);
         }
         (mAdapter).removeItem(position);
     }
 
+    public void removeImageFromCache(String image_name){
+        String filePath = mainActivity.getFilesDir() + File.separator + image_name;
+        File fileToBeDeleted = new File(filePath);
+        try {
+            if (fileToBeDeleted.exists()) {
+                boolean deleted = fileToBeDeleted.delete();
+                if (deleted) {
+                    Log.d(TAG, image_name + " deleted");
+                } else {
+                    Log.d(TAG, "Could not find " + image_name + " in files dir");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    class DownloadTask extends AsyncTask<String, Void, String> {
+        private String image_name;
+        private String local_path;
+        private AlertDialog alertDialog;
+
+        DownloadTask(String image_name, AlertDialog alertDialog) {
+            this.image_name = image_name;
+            this.local_path = mainActivity.getFilesDir().toString() + File.separator + image_name;
+            this.alertDialog = alertDialog;
+            mainActivity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+            try {
+                File file = new File(local_path);
+                if (!file.exists()) {
+                    Log.d(TAG, "Download started");
+                    easyFTP ftp = new easyFTP();
+                    ftp.connect(sharedPreferences.getString(FtpFragment.FTPIP_KEY, null), sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null), sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null));
+                    ftp.downloadFile(getString(R.string.path_of_images) + image_name, local_path);
+                    Log.d(TAG, "Download Successfull");
+                }
+                alertDialog.dismiss();
+                return local_path;
+            } catch (Exception e) {
+                e.printStackTrace();
+                String t = "Failure : " + e.getLocalizedMessage();
+                Log.d(TAG, t);
+                return null;
+            }
+
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            mainActivity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+            if (s != null) {
+                Log.d(TAG, "result: " + s);
+                viewFile(s);
+            }
+        }
+    }
+
     public void removeAllCaptures() {
+        for(RecyclerItem recyclerItem : mRecyclerList){
+            removeImageFromCache(getImageNameFromCapture(recyclerItem));
+        }
         mRecyclerList.clear();
-        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
+        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
         stringList.clear();
-        MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,mainActivity);
+        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
         mAdapter.notifyDataSetChanged();
-        Toast.makeText(mainActivity,"All captures deleted",Toast.LENGTH_SHORT).show();
+        Toast.makeText(mainActivity, "All captures deleted", Toast.LENGTH_SHORT).show();
     }
 
     public void setCustomBackground() {
         mRecyclerView.setBackgroundResource(R.drawable.background_space1);
         mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
-    }
-
-    public void setImageToBeOpened(String imageName){
-        this.imageToBeOpened = imageName;
-    }
-
-    public String getImageToBeOpened(){
-        return this.imageToBeOpened;
     }
 
     @Override
@@ -470,11 +469,11 @@ public class PassesFragment extends Fragment {
 
         int id = item.getItemId();
 
-        if(id == R.id.deleteAll) {
+        if (id == R.id.deleteAll) {
             removeAllCaptures();
         }
-        if(id == R.id.refreshButton) {
-            if(refreshJob()){
+        if (id == R.id.refreshButton) {
+            if (refreshJob()) {
                 Toast.makeText(mainActivity, "Manually refreshed jobs", Toast.LENGTH_SHORT);
             }
         }
@@ -482,8 +481,8 @@ public class PassesFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
-    public void viewFile(String file_name, String directory) {
-        File imagePath = new File(directory + File.separator + file_name);
+    public void viewFile(String localPath) {
+        File imagePath = new File(localPath);
         Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
 
         Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
@@ -492,28 +491,4 @@ public class PassesFragment extends Fragment {
         galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         mainActivity.startActivity(galleryIntent);
     }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode,resultCode,data);
-
-        if(requestCode == DOWNLOAD_FILES_REQUEST) {
-            if (data != null) {
-                String status = data.getStringExtra("TRANSFERSTATUS");
-                Log.d(TAG, "Transfer status: " + status);
-                if (status.equals("COMPLETED")) {
-
-                    String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null);
-                    if(localDir != null){
-                        viewFile(this.getImageToBeOpened(), localDir);
-                    }
-                }
-                else if (status.equals("FAILED")){
-                    Toast.makeText(mainActivity, "Download failed",Toast.LENGTH_SHORT).show();
-                }
-            }
-        }
-
-    }
-
 }

@@ -5,6 +5,7 @@
     <string name="ftp_username_prompt">Please enter FTP username</string>
     <string name="username_hint">Username</string>
     <string name="password_hint">Password</string>
+    <string name="path_of_images">/files/</string>
     <string name="submit">Submit</string>
     <string name="cancel">Cancel</string>
     <string name="ftp_password_prompt">Please enter FTP password</string>
