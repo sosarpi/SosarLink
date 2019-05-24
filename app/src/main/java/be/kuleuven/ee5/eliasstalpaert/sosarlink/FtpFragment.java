@@ -32,14 +32,10 @@ import com.github.angads25.filepicker.model.DialogConfigs;
 import com.github.angads25.filepicker.model.DialogProperties;
 import com.github.angads25.filepicker.view.FilePickerDialog;
 
-import net.rdrei.android.dirchooser.DirectoryChooserActivity;
-import net.rdrei.android.dirchooser.DirectoryChooserConfig;
-
-import java.io.File;
 
 public class FtpFragment extends Fragment {
 
-    private static final int REQUEST_DIRECTORY = 1;
+    private static final String TAG = FtpFragment.class.getSimpleName();
     public static final String LOCALDIR_KEY = "localDir";
     public static final String FTPIP_KEY = "ftpIp";
     public static final String FTPUSER_KEY = "ftpUser";
@@ -49,6 +45,8 @@ public class FtpFragment extends Fragment {
     private Button submitButton;
     private View fragmentView;
     private MainActivity mainActivity;
+
+    private boolean callback;
 
     private SharedPreferences sharedPreferences;
 
@@ -88,9 +86,22 @@ public class FtpFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-
+        /*
         if(sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null) == null) {
             Toast.makeText(mainActivity, "Please choose a default save directory", Toast.LENGTH_LONG);
+            changeDefaultSaveDir();
+        }
+        */
+
+        Bundle args = this.getArguments();
+        if(args != null){
+            this.callback = args.getBoolean("callback",false);
+        }
+        else{
+            callback = false;
+        }
+
+        if(callback){
             changeDefaultSaveDir();
         }
 
@@ -106,12 +117,24 @@ public class FtpFragment extends Fragment {
             ftpPassword.setText("");
         }
         if(ftpip == null) {
-            PassesFragment.setDefaultIP(mainActivity);
-            ftpip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+            PassesFragment passesFragment = new PassesFragment();
+
+            mainActivity.getmNavigationView().setCheckedItem(R.id.nav_passes);
+            mainActivity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
+                    passesFragment).commit();
         }
-        ftpIp.setText(ftpip);
+        else{
+            ftpIp.setText(ftpip);
+        }
+    }
 
-
+    public void setDefaultIP() {
+        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(mainActivity).edit();
+        String gatewayIp = PassesFragment.getGatewayIp(mainActivity);
+        editor.putString(FtpFragment.FTPIP_KEY, gatewayIp);
+        Toast.makeText(mainActivity, "IP set to: " + gatewayIp,Toast.LENGTH_SHORT).show();
+        editor.apply();
+        ftpIp.setText(gatewayIp);
     }
 
     public void updateFtpSettings(){
@@ -135,98 +158,31 @@ public class FtpFragment extends Fragment {
         properties.offset = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
         properties.extensions = null;
 
-        FilePickerDialog dialog = new FilePickerDialog(mainActivity,properties);
+        FilePickerDialog dialog = new FilePickerDialog(mainActivity, properties);
         dialog.setTitle("Select a Directory");
 
         dialog.setDialogSelectionListener(new DialogSelectionListener() {
             @Override
             public void onSelectedFilePaths(String[] files) {
                 String fullpath = "";
-                for(int i = 0; i < files.length; i++){
+                for (int i = 0; i < files.length; i++) {
                     fullpath = fullpath + files[i];
                 }
-                Log.d("FilePicker", fullpath);
                 SharedPreferences.Editor editor = sharedPreferences.edit();
                 editor.putString(FtpFragment.LOCALDIR_KEY, fullpath);
                 editor.apply();
+
+                if(callback){
+                    callback = false;
+                    mainActivity.getmNavigationView().setCheckedItem(R.id.nav_passes);
+                    mainActivity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new PassesFragment()).commit();
+                }
             }
         });
 
         dialog.show();
-
-        /*
-        Log.d("DefDir", Environment.getExternalStorageDirectory().toString());
-        Toast.makeText(mainActivity, "Choose default save directory", Toast.LENGTH_LONG).show();
-
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        i.addCategory(Intent.CATEGORY_DEFAULT);
-        startActivityForResult(Intent.createChooser(i, "Choose default save directory"), REQUEST_DIRECTORY);
-        /*
-        Intent chooserIntent = new Intent(mainActivity, DirectoryChooserActivity.class);
-        chooserIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-        DirectoryChooserConfig config = DirectoryChooserConfig.builder()
-                .newDirectoryName("SaveDirectory")
-                .initialDirectory(Environment.getExternalStorageDirectory().toString())
-                .allowReadOnlyDirectory(true)
-                .allowNewDirectoryNameModification(true)
-                .build();
-
-        chooserIntent.putExtra(DirectoryChooserActivity.EXTRA_CONFIG, config);
-
-        startActivityForResult(chooserIntent, REQUEST_DIRECTORY);
-        */
-    }
-/*
-    public void resetFtpDefaults(){
-        WifiManager wifiManager = (WifiManager) mainActivity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
-
-        String gatewayIP = formatIP(dhcpInfo.gateway);
-        ftpIp.setText(gatewayIP);
-
-        ftpUsername.setText("pi");
-        ftpPassword.setText("sosarpi");
-        ftpPassword.setTransformationMethod(PasswordTransformationMethod.getInstance());
     }
 
-    public void requestFtp() {
-
-        if(localDir == null) {
-            Toast.makeText(mainActivity, "Set a default save directory first", Toast.LENGTH_LONG).show();
-        }
-        else {
-            getImageFromRecyclerItem(localDir);
-        }
-    }
-    /*
-    public void getImageFromRecyclerItem(String dir) {
-        Intent intent = new Intent();
-        intent.setAction(Intent.ACTION_PICK);
-        Uri ftpUri = Uri.parse("ftp://" + ftpIp.getText().toString());
-        intent.setDataAndType(ftpUri, "vnd.android.cursor.dir/lysesoft.andftp.uri");
-        intent.putExtra("command_type", "download");
-        intent.putExtra("ftp_username", ftpUsername.getText().toString());
-        intent.putExtra("ftp_password", ftpPassword.getText().toString());
-        intent.putExtra("ftp_overwrite","skip");
-        intent.putExtra("progress_title", "Downloading picture...");
-        intent.putExtra("remote_file1", "/files/test.jpg");
-        intent.putExtra("local_folder", dir);
-        intent.putExtra("close_ui", "true");
-        intent.setFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        startActivityForResult(intent, DOWNLOAD_FILES_REQUEST);
-    }
-
-    private String formatIP(int ip) {
-        return String.format(
-                "%d.%d.%d.%d",
-                (ip & 0xff),
-                (ip >> 8 & 0xff),
-                (ip >> 16 & 0xff),
-                (ip >> 24 & 0xff)
-        );
-    }
-*/
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.ftp_menu, menu);
@@ -238,8 +194,15 @@ public class FtpFragment extends Fragment {
 
         int id = item.getItemId();
 
-        if(id == R.id.changeDefaultDir) {
-            changeDefaultSaveDir();
+        switch (id) {
+            case R.id.changeDefaultDir :
+                changeDefaultSaveDir();
+                break;
+            case R.id.setDefaultIp :
+                setDefaultIP();
+                break;
+                default:
+                    break;
         }
 
         return super.onOptionsItemSelected(item);

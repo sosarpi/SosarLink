@@ -13,6 +13,7 @@ import android.net.DhcpInfo;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -43,6 +44,8 @@ import static android.content.Context.JOB_SCHEDULER_SERVICE;
 public class PassesFragment extends Fragment {
 
     private static final int DOWNLOAD_FILES_REQUEST = 0;
+    private static final String TAG = PassesFragment.class.getSimpleName();
+
 
     private RecyclerView mRecyclerView;
     private RecyclerAdapter mAdapter;
@@ -54,6 +57,7 @@ public class PassesFragment extends Fragment {
     private SharedPreferences sharedPreferences;
 
     private String imageToBeOpened;
+    private Boolean callback;
 
     private View fragmentView;
 
@@ -66,6 +70,46 @@ public class PassesFragment extends Fragment {
         buildRecyclerView();
 
         return fragmentView;
+    }
+
+    public void promptForIp() {
+        final SharedPreferences.Editor editor = sharedPreferences.edit();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+        builder.setTitle("First Time Setup of IP");
+        builder.setView(R.layout.ip_alarmdialog);
+        final AlertDialog alertDialog = builder.create();
+        alertDialog.show();
+
+        Button submitIpButton = alertDialog.findViewById(R.id.submitIpButton);
+        Button defaultGatewayButton = alertDialog.findViewById(R.id.defaultGatewayButton);
+
+        final EditText ipEditText = alertDialog.findViewById(R.id.ipEditText);
+
+        submitIpButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String ip = ipEditText.getText().toString();
+                editor.putString(FtpFragment.FTPIP_KEY, ip);
+                editor.apply();
+                Toast.makeText(mainActivity, "IP set manually to: " + ip, Toast.LENGTH_SHORT).show();
+                alertDialog.dismiss();
+                refreshJob();
+            }
+        });
+        defaultGatewayButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String gatewayIp = getGatewayIp(mainActivity);
+                editor.putString(FtpFragment.FTPIP_KEY, gatewayIp);
+                editor.apply();
+                Toast.makeText(mainActivity, "IP set to: " + gatewayIp, Toast.LENGTH_SHORT).show();
+                alertDialog.dismiss();
+                refreshJob();
+            }
+        });
+
+
     }
 
     @Override
@@ -82,14 +126,49 @@ public class PassesFragment extends Fragment {
             @Override
             public void onReceive(Context context, Intent intent) {
                 updateRecyclerView();
-                Log.d("Notification Receiver", "Broadcast received");
+                Log.d(TAG, "Broadcast received");
             }
         };
+    }
+
+    public boolean refreshJob() {
+        String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+        if(ip == null) {
+            promptForIp();
+            return false;
+        }
+        else{
+            JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
+            mJobScheduler.cancelAll();
+
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(FtpFragment.FTPIP_KEY,ip);
+
+            JobInfo.Builder mJobBuilder =
+                    new JobInfo.Builder(1,
+                            new ComponentName(mainActivity, Job.class))
+                            .setPersisted(true)
+                            .setExtras(extras)
+                            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
+
+            int resultCode = mJobScheduler.schedule(mJobBuilder.build());
+            if (resultCode == JobScheduler.RESULT_SUCCESS) {
+                Log.d(TAG, "Jobs refreshed successfully");
+                return true;
+            } else {
+                Log.d(TAG, "Failed to refresh jobs");
+                return false;
+            }
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        if(sharedPreferences.getString(FtpFragment.FTPIP_KEY, null) == null) {
+            promptForIp();
+        }
+
         mainActivity.registerReceiver(mNotificationReceiver, new IntentFilter("SATELLITE"));
         updateRecyclerView();
     }
@@ -139,13 +218,13 @@ public class PassesFragment extends Fragment {
 
 
         if(ftpIp == null) {
-            setDefaultIP(mainActivity);
+            promptForIp();
             ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
         }
         if(ftpPassword == null || ftpUsername == null) {
             firstTimeFtpCredentials();
         }
-        else if(isLocalDirValid(localDir)) {
+        else if(isLocalDirValid()) {
             String image_name = getImageNameFromCapture(recyclerItem);
             this.setImageToBeOpened(image_name);
 
@@ -172,10 +251,14 @@ public class PassesFragment extends Fragment {
         }
     }
 
-    public boolean isLocalDirValid(String localDir){
+    public boolean isLocalDirValid(){
+        String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY,null);
         if(localDir == null){
 
             FtpFragment ftpFragment = new FtpFragment();
+            Bundle args = new Bundle();
+            args.putBoolean("callback",true);
+            ftpFragment.setArguments(args);
 
             mainActivity.getmNavigationView().setCheckedItem(R.id.nav_ftp);
             mainActivity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
@@ -185,13 +268,7 @@ public class PassesFragment extends Fragment {
         return true;
     }
 
-    public static void setDefaultIP(Context context) {
-        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
-        editor.putString(FtpFragment.FTPIP_KEY, getFtpIp(context));
-        editor.apply();
-    }
-
-    public static String getFtpIp(Context context) {
+    public static String getGatewayIp(Context context) {
         WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
 
@@ -232,6 +309,7 @@ public class PassesFragment extends Fragment {
                 editor.apply();
                 Toast.makeText(mainActivity, "Credentials submitted", Toast.LENGTH_SHORT).show();
                 alertDialog.dismiss();
+                isLocalDirValid();
             }
         });
         cancel.setOnClickListener(new View.OnClickListener() {
@@ -244,11 +322,11 @@ public class PassesFragment extends Fragment {
 
     public void updateRecyclerView() {
 
-        Log.d("PassesFragment", "Updating UI");
+        Log.d(TAG, "Updating UI");
 
         ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
         if (stringList != null) {
-            Log.d("PassesFragment", "Stringlist found");
+            Log.d(TAG, "Stringlist found");
             Iterator<String> iterator = stringList.iterator();
             while (iterator.hasNext()) {
                 String next = iterator.next();
@@ -257,7 +335,7 @@ public class PassesFragment extends Fragment {
             mAdapter.notifyDataSetChanged();
             mRecyclerView.smoothScrollToPosition(mAdapter.getItemCount());
         } else {
-            Log.d("PassesFragment", "Stringlist not found");
+            Log.d(TAG, "Stringlist not found");
         }
 
     }
@@ -271,7 +349,6 @@ public class PassesFragment extends Fragment {
             RecyclerItem next = itemIterator.next();
             if(next.getText1().equals(satellite_name) && next.getText2().equals(concatTimeDate)) {
                 found = true;
-                Log.d("parseStringListEntry", "Item already in RecyclerView, skipping...");
             }
         }
         if(found == false) {
@@ -287,9 +364,9 @@ public class PassesFragment extends Fragment {
         String hours = concatTimeDate.substring(0, 2);
         String minutes = concatTimeDate.substring(2, 4);
         String seconds = concatTimeDate.substring(4, 6);
-        String day = concatTimeDate.substring(6, 8);
+        String year = concatTimeDate.substring(6, 8);
         String month = concatTimeDate.substring(8, 10);
-        String year = concatTimeDate.substring(10, 12);
+        String day = concatTimeDate.substring(10, 12);
 
         if(satelliteName.contains("NOAA")){
             image_name = satelliteName + "20" + year + month + day + "-" + hours + minutes + seconds + ".png";
@@ -305,7 +382,6 @@ public class PassesFragment extends Fragment {
         RecyclerItem toBeRemoved_item = mRecyclerList.get(position);
         if (toBeRemoved_item != null) {
             String toBeRemoved_string = toBeRemoved_item.getText1() + toBeRemoved_item.getText2();
-            Log.d("PassesFragment", "To be removed string: " + toBeRemoved_string);
             ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,mainActivity);
             if (stringList != null) {
                 Iterator<String> iterator = stringList.iterator();
@@ -316,14 +392,14 @@ public class PassesFragment extends Fragment {
                         iterator.remove();
                         found = true;
                         MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,mainActivity);
-                        Log.d("PassesFragment", "Element removed from SharedPreferences");
+                        Log.d(TAG, "Element removed from SharedPreferences");
                     }
                 }
                 if (found == false) {
-                    Log.d("PassesFragment", "Element not found in SharedPreferences");
+                    Log.d(TAG, "Element not found in SharedPreferences");
                 }
             } else {
-                Log.d("PassesFragment", "Stringlist not found");
+                Log.d(TAG, "Stringlist not found");
             }
 
 
@@ -370,26 +446,6 @@ public class PassesFragment extends Fragment {
         Toast.makeText(mainActivity,"All captures deleted",Toast.LENGTH_SHORT).show();
     }
 
-    public void refreshJob() {
-        JobScheduler mJobScheduler = (JobScheduler) mainActivity
-                .getSystemService(JOB_SCHEDULER_SERVICE);
-        mJobScheduler.cancelAll();
-
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(mainActivity, Job.class))
-                        .setPersisted(true)
-                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-        int resultCode = mJobScheduler.schedule(mJobBuilder.build());
-        if(resultCode == JobScheduler.RESULT_SUCCESS){
-            Log.d("Passes Fragment", "Refreshed successfully");
-            Toast.makeText(mainActivity,"Refreshed manually",Toast.LENGTH_SHORT).show();
-        }
-        else {
-            Log.d("Passes Fragment", "Failed to refresh");
-        }
-    }
-
     public void setCustomBackground() {
         mRecyclerView.setBackgroundResource(R.drawable.background_space1);
         mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
@@ -418,7 +474,9 @@ public class PassesFragment extends Fragment {
             removeAllCaptures();
         }
         if(id == R.id.refreshButton) {
-            refreshJob();
+            if(refreshJob()){
+                Toast.makeText(mainActivity, "Manually refreshed jobs", Toast.LENGTH_SHORT);
+            }
         }
 
         return super.onOptionsItemSelected(item);
@@ -442,7 +500,7 @@ public class PassesFragment extends Fragment {
         if(requestCode == DOWNLOAD_FILES_REQUEST) {
             if (data != null) {
                 String status = data.getStringExtra("TRANSFERSTATUS");
-                Log.d("FtpFragment", "Transfer status: " + status);
+                Log.d(TAG, "Transfer status: " + status);
                 if (status.equals("COMPLETED")) {
 
                     String localDir = sharedPreferences.getString(FtpFragment.LOCALDIR_KEY, null);

@@ -99,9 +99,9 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
         String hours = concatTimeDate.substring(0, 2);
         String minutes = concatTimeDate.substring(2, 4);
         String seconds = concatTimeDate.substring(4, 6);
-        String day = concatTimeDate.substring(6, 8);
+        String year = concatTimeDate.substring(6, 8);
         String month = concatTimeDate.substring(8, 10);
-        String year = concatTimeDate.substring(10, 12);
+        String day = concatTimeDate.substring(10, 12);
         recyclerViewHolder.mTextView2.setText(hours + ":" + minutes + ":" + seconds + "\t" + day + "/" + month + "/" + year);
     }
 

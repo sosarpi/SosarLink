@@ -1,5 +1,6 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
+import android.app.TaskStackBuilder;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.ComponentName;
@@ -26,7 +27,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
-    private static final String TAG = "MainActivity";
+    private static final String TAG = MainActivity.class.getSimpleName();
     public static final String LIST_NAME = "satellite";
 
     private DrawerLayout drawer;
@@ -37,9 +38,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
-        //editor.clear();
-        //editor.apply();
+        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
+        editor.clear();
+        editor.apply();
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -57,8 +58,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 new PassesFragment()).commit();
         mNavigationView.setCheckedItem(R.id.nav_passes);
 
-        initialJob(); //Schedule Jobs
-
     }
 
     public NavigationView getmNavigationView() {
@@ -68,31 +67,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     @Override
     protected void onDestroy() {
         super.onDestroy();
-    }
-
-    public void initialJob() {
-        /*
-        ComponentName componentName = new ComponentName(this, Job.class);
-        JobInfo info = new JobInfo.Builder(1, componentName)
-                .setPersisted(true)            //Na reboot zal job nog altijd onthouden worden.
-                .setPeriodic(1 * 60 * 1000)    //Job iedere 30 minuten. Minimum mogelijk in te stellen is 15 minuten.
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-                .build();
-        */
-
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(this, Job.class))
-                .setPersisted(true)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-
-        JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-        int resultCode = scheduler.schedule(mJobBuilder.build());
-        if (resultCode == JobScheduler.RESULT_SUCCESS) {
-            Log.d(TAG, "Initial job successfully scheduled");
-        } else {
-            Log.d(TAG, "Failed to schedule initial job");
-        }
     }
 
     @Override
@@ -118,11 +92,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         String json = gson.toJson(list);
         editor.putString(key, json);
         editor.apply();     // This line is IMPORTANT !!!
-        Log.d("Static", "ArrayList saved");
+        Log.d(TAG, "ArrayList saved");
     }
 
     public static ArrayList<String> getArrayList(String key, Context context){
-        Log.d("Static", "Trying to receive ArrayList");
+        Log.d(TAG, "Trying to receive ArrayList");
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         Gson gson = new Gson();
         String json = prefs.getString(key, null);

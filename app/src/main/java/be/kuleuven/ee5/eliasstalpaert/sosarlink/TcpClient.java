@@ -15,8 +15,7 @@ import java.net.SocketTimeoutException;
 
 public class TcpClient {
 
-    public static final String TAG = TcpClient.class.getSimpleName();
-    public static final String SERVER_IP = "10.42.0.1"; //server IP address
+    private static final String TAG = TcpClient.class.getSimpleName();
     public static final int SERVER_PORT = 5678;
     // message to send to the server
     private String mServerMessage;
@@ -29,31 +28,14 @@ public class TcpClient {
     // used to read messages from the server
     private BufferedReader mBufferIn;
 
+    private String serverIp;
+
     /**
      * Constructor of the class. OnMessagedReceived listens for the messages received from server
      */
-    public TcpClient(OnMessageReceived listener) {
+    public TcpClient(OnMessageReceived listener, String ip) {
+        this.serverIp = ip;
         mMessageListener = listener;
-    }
-
-    /**
-     * Sends the message entered by client to the server
-     *
-     * @param message text entered by client
-     */
-    public void sendMessage(final char message) {
-        Runnable runnable = new Runnable() {
-            @Override
-            public void run() {
-                if (mBufferOut != null) {
-                    Log.d(TAG, "Sending: " + message);
-                    mBufferOut.println(message);
-                    mBufferOut.flush();
-                }
-            }
-        };
-        Thread thread = new Thread(runnable);
-        thread.start();
     }
 
     /**
@@ -81,9 +63,9 @@ public class TcpClient {
 
         try {
             //here you must put your computer's IP address.
-            InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
+            InetAddress serverAddr = InetAddress.getByName(this.serverIp);
 
-            Log.d("TCP Client", "C: Connecting...");
+            Log.d(TAG, "C: Connecting...");
 
             //create a socket to make the connection with the server
             InetSocketAddress address = new InetSocketAddress(serverAddr, SERVER_PORT);
@@ -112,10 +94,10 @@ public class TcpClient {
                         if (mServerMessage != null && mMessageListener != null) {
                             //call the method messageReceived from MyActivity class
                             mMessageListener.messageReceived(mServerMessage);
-                            Log.d("RESPONSE FROM SERVER", "S: Received Message: '" + mServerMessage + "'");
+                            Log.d(TAG, "S: Received Message: '" + mServerMessage + "'");
                             if(mServerMessage.contains("no")) {
                                 stopClient();
-                                Log.d("TCP Client", "C: Socket Closed");
+                                Log.d(TAG, "C: Socket Closed");
                             }
                         }
 

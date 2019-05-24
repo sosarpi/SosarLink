@@ -3,6 +3,8 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.TaskStackBuilder;
 import android.app.job.JobInfo;
 import android.app.job.JobParameters;
 import android.app.job.JobScheduler;
@@ -13,6 +15,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Build;
+import android.os.PersistableBundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
@@ -22,16 +25,18 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class Job extends JobService {
-    private static final String TAG = "Job";
+    private static final String TAG = Job.class.getSimpleName();
     private static final int INTERVAL = 5;
 
     JobParameters mParams;
+    String ip;
 
     //onStartJob called when job launched
     @Override
     public boolean onStartJob(JobParameters params) {
         Log.d(TAG, "Job started");
         this.mParams = params;
+        this.ip = params.getExtras().getString(FtpFragment.FTPIP_KEY);
         scheduleRefresh();
         doBackGroundWork(params);
 
@@ -43,7 +48,7 @@ public class Job extends JobService {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new ConnectTask(getApplicationContext()).execute("");
+                new ConnectTask(getApplicationContext(), ip).execute("");
                 Log.d(TAG, "AsyncTask started");
             }
         }).start();
@@ -58,9 +63,13 @@ public class Job extends JobService {
                 new JobInfo.Builder(1,
                         new ComponentName(this,
                                 Job.class));
+        PersistableBundle extras = new PersistableBundle();
+        extras.putString(FtpFragment.FTPIP_KEY, this.ip);
+
         mJobBuilder
                 .setMinimumLatency(INTERVAL * 60 * 1000) //tijdsinterval
                 .setPersisted(true)
+                .setExtras(extras)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
 
         int resultCode = mJobScheduler.schedule(mJobBuilder.build());
@@ -88,9 +97,12 @@ public class Job extends JobService {
         int notifyID;
         boolean captureReceived;
 
-        ConnectTask(Context mContext) {
+        private String ip;
+
+        ConnectTask(Context mContext, String ip) {
             super();
             this.mContext = mContext;
+            this.ip = ip;
             this.notifyID = 0;
             this.captureReceived = false;
 
@@ -126,7 +138,7 @@ public class Job extends JobService {
                     //this method calls the onProgressUpdate
                     publishProgress(message);
                 }
-            });
+            }, this.ip);
 
             mTcpClient.run();
 
@@ -191,22 +203,21 @@ public class Job extends JobService {
         }
 
         public void pushNotification(String nMessage) {
+            Intent intent = new Intent(getApplicationContext(),MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, intent, 0);
+
+            Notification.Builder notificationBuilder = new Notification.Builder(mContext)
+                    .setContentTitle("New weather satellite picture!")
+                    .setContentText(nMessage)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setSmallIcon(R.mipmap.ic_sosarlogo);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Notification n = new Notification.Builder(mContext, mChannel.getId())
-                        .setContentTitle("New weather satellite picture!")
-                        .setContentText(nMessage)
-                        .setSmallIcon(R.drawable.ic_launcher_foreground)
-                        .setChannelId(mChannel.getId())
-                        .build();
-                NM.notify(notifyID, n);
+                notificationBuilder.setChannelId(mChannel.getId());
+                NM.notify(notifyID, notificationBuilder.build());
             } else {
-                Notification n = new Notification.Builder(mContext)
-                        .setContentTitle("New weather satellite picture!")
-                        .setContentText(nMessage)
-                        .setSmallIcon(R.drawable.ic_launcher_background)
-                        .build();
-                NM.notify(notifyID, n);
+                NM.notify(notifyID, notificationBuilder.build());
             }
             notifyID++;
         }

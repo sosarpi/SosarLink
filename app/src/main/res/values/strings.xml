@@ -8,4 +8,7 @@
     <string name="submit">Submit</string>
     <string name="cancel">Cancel</string>
     <string name="ftp_password_prompt">Please enter FTP password</string>
+    <string name="ip_alarmdialog">Enter an IP or choose default gateway IP</string>
+    <string name="manualip_hint">Manual IP</string>
+    <string name="gateway">Default gateway address</string>
 </resources>

@@ -6,35 +6,26 @@
 
     <TextView
         android:layout_width="wrap_content"
-        android:text="@string/ftp_username_prompt"
+        android:text="@string/ip_alarmdialog"
         android:layout_height="wrap_content" />
     <EditText
         android:layout_width="wrap_content"
-        android:id="@+id/ftp_username"
-        android:hint="@string/username_hint"
-        android:layout_height="wrap_content" />
-    <TextView
-        android:layout_width="wrap_content"
-        android:text="@string/ftp_password_prompt"
-        android:layout_height="wrap_content" />
-    <EditText
-        android:layout_width="wrap_content"
-        android:id="@+id/ftp_password"
-        android:hint="@string/password_hint"
+        android:id="@+id/ipEditText"
+        android:hint="@string/manualip_hint"
         android:layout_height="wrap_content" />
     <LinearLayout
-        android:orientation="horizontal"
         android:layout_width="wrap_content"
+        android:orientation="horizontal"
         android:layout_height="wrap_content">
         <Button
-            android:text="@string/submit"
-            android:id="@+id/ftpCredSubmit"
             android:layout_width="wrap_content"
+            android:id="@+id/submitIpButton"
+            android:text="@string/submit"
             android:layout_height="wrap_content" />
         <Button
+            android:id="@+id/defaultGatewayButton"
             android:layout_width="wrap_content"
-            android:text="@string/cancel"
-            android:id="@+id/ftpCredCancel"
+            android:text="@string/gateway"
             android:layout_height="wrap_content" />
     </LinearLayout>
 

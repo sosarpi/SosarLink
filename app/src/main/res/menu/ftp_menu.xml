@@ -5,4 +5,8 @@
         android:id="@+id/changeDefaultDir"
         android:title="Change Default Save Directory"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/setDefaultIp"
+        android:title="Set IP to default gateway"
+        app:showAsAction="never"/>
 </menu>
