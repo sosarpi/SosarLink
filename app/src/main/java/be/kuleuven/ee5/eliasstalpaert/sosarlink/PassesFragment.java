@@ -65,22 +65,241 @@ public class PassesFragment extends Fragment {
 
     private View fragmentView;
 
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        this.setHasOptionsMenu(true);
+
+        mainActivity = (MainActivity) getActivity();
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
+        mainActivity.setTitle("Captures");
+
+        mNotificationReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                updateRecyclerView();
+                Log.d(TAG, "Broadcast received");
+            }
+        };
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         fragmentView = inflater.inflate(R.layout.fragment_passes, container, false);
         mRecyclerView = fragmentView.findViewById(R.id.recyclerView);
-        buildRecyclerView();
+        setupRecyclerView();
 
         return fragmentView;
     }
 
-    public void promptForIp() {
+    @Override
+    public void onResume() {
+        super.onResume();
+        mainActivity.registerReceiver(mNotificationReceiver, new IntentFilter("SATELLITE"));
+        updateRecyclerView();
+
+        if (sharedPreferences.getString(FtpFragment.FTPIP_KEY, null) == null) {
+            Log.d(TAG, "server_ip is null af (resume)");
+            if (!prompt_displayed) promptForIp();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mainActivity.unregisterReceiver(mNotificationReceiver);
+    }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.passes_menu, menu);
+        super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        int id = item.getItemId();
+
+        if (id == R.id.deleteAll) {
+            removeAllRecyclerItems();
+        }
+        if (id == R.id.refreshButton) {
+            if (refreshJob()) {
+                Toast.makeText(mainActivity, "Manually refreshed jobs", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void setCustomBackground() {
+        mRecyclerView.setBackgroundResource(R.drawable.background_space1);
+        mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
+    }
+
+
+    private void setupRecyclerView() {
+        mRecyclerView.setHasFixedSize(true); //better performance
+        this.setCustomBackground();
+        mLayoutManager = new LinearLayoutManager(mainActivity);
+        ((LinearLayoutManager) mLayoutManager).setReverseLayout(true);
+        ((LinearLayoutManager) mLayoutManager).setStackFromEnd(true);
+        mRecyclerList = new ArrayList<>();
+        mAdapter = new RecyclerAdapter(mRecyclerList);
+        mRecyclerView.setLayoutManager(mLayoutManager);
+        mRecyclerView.setAdapter(mAdapter);
+        mAdapter.setOnItemClickListener(new RecyclerAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(int position) {
+                getImageFromRecyclerItem(mRecyclerList.get(position));
+            }
+        });
+
+        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder viewHolder1) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int i) {
+                removeRecyclerItemByPosition(viewHolder.getAdapterPosition());
+            }
+        }).attachToRecyclerView(mRecyclerView);
+    }
+
+    private void updateRecyclerView() {
+
+        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
+        if (stringList != null) {
+            Log.d(TAG, "Stringlist found");
+            Iterator<String> iterator = stringList.iterator();
+            while (iterator.hasNext()) {
+                String next = iterator.next();
+                addToRecyclerViewIfNotPresent(next);
+            }
+            mAdapter.notifyDataSetChanged();
+            mRecyclerView.smoothScrollToPosition(mAdapter.getItemCount());
+        } else {
+            Log.d(TAG, "Stringlist not found");
+        }
+
+    }
+
+    private void addToRecyclerViewIfNotPresent(String s) {
+        String satellite_name = s.substring(0, 6);
+        String concatTimeDate = s.substring(6, 18);
+        Iterator<RecyclerItem> itemIterator = mRecyclerList.iterator();
+        boolean found = false;
+        while (itemIterator.hasNext() && found == false) {
+            RecyclerItem next = itemIterator.next();
+            if (next.getText1().equals(satellite_name) && next.getText2().equals(concatTimeDate)) {
+                found = true;
+            }
+        }
+        if (found == false) {
+            mRecyclerView.smoothScrollToPosition(0);
+            mRecyclerList.add(new RecyclerItem(satellite_name, concatTimeDate));
+        }
+    }
+
+    private void getImageFromRecyclerItem(RecyclerItem recyclerItem) {
+        String ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+        String ftpUsername = sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null);
+        String ftpPassword = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
+
+        if (ftpIp == null) {
+            promptForIp();
+        }
+        if (ftpPassword == null || ftpUsername == null) {
+            firstTimeFtpCredentials();
+        } else {
+            String image_name = getImageNameFromRecyclerItem(recyclerItem);
+            TextView textView = new TextView(mainActivity);
+            textView.setText(image_name);
+            AlertDialog alertDialog = new AlertDialog.Builder(mainActivity)
+                    .setTitle("Downloading...")
+                    .setView(textView)
+                    .setCancelable(false)
+                    .create();
+            alertDialog.show();
+
+            new DownloadTask(image_name, alertDialog).execute();
+        }
+    }
+
+    private String getImageNameFromRecyclerItem(RecyclerItem recyclerItem) {
+        String image_name = "error.jpg";
+        String satelliteName = recyclerItem.getText1();
+        String concatTimeDate = recyclerItem.getText2();
+        String hours = concatTimeDate.substring(0, 2);
+        String minutes = concatTimeDate.substring(2, 4);
+        String seconds = concatTimeDate.substring(4, 6);
+        String year = concatTimeDate.substring(6, 8);
+        String month = concatTimeDate.substring(8, 10);
+        String day = concatTimeDate.substring(10, 12);
+
+        if (satelliteName.contains("NOAA")) {
+            image_name = satelliteName + "20" + year + month + day + "-" + hours + minutes + seconds + ".png";
+        } else if (satelliteName.contains("METEOR")) {
+            image_name = "METEOR-M220" + year + month + day + "-" + hours + minutes + seconds + ".png";
+        }
+
+        return image_name;
+    }
+
+    private void removeRecyclerItemByPosition(int position) {
+        RecyclerItem recyclerItem = mRecyclerList.get(position);
+        if (recyclerItem != null) {
+            String toBeRemoved_string = recyclerItem.getText1() + recyclerItem.getText2();
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
+            if (stringList != null) {
+                Iterator<String> iterator = stringList.iterator();
+                boolean found = false;
+                while (iterator.hasNext() && found == false) {
+                    String next = iterator.next();
+                    if (next.equals(toBeRemoved_string)) {
+                        iterator.remove();
+                        found = true;
+                        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
+                        Log.d(TAG, "Element removed from SharedPreferences");
+                    }
+                }
+                if (found == false) {
+                    Log.d(TAG, "Element not found in SharedPreferences");
+                }
+            } else {
+                Log.d(TAG, "Stringlist not found");
+            }
+
+            String image_name = getImageNameFromRecyclerItem(recyclerItem);
+            removeImageFromCache(image_name);
+        }
+        (mAdapter).removeItemAtPosition(position);
+    }
+
+    private void removeAllRecyclerItems() {
+        for (RecyclerItem recyclerItem : mRecyclerList) {
+            removeImageFromCache(getImageNameFromRecyclerItem(recyclerItem));
+        }
+        mRecyclerList.clear();
+        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
+        stringList.clear();
+        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
+        mAdapter.notifyDataSetChanged();
+        Toast.makeText(mainActivity, "All captures deleted", Toast.LENGTH_SHORT).show();
+    }
+
+
+    private void promptForIp() {
         prompt_displayed = true;
         final SharedPreferences.Editor editor = sharedPreferences.edit();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
-        builder.setTitle("First Time Setup of IP");
+        builder.setTitle("First Time Setup: IP");
         builder.setView(R.layout.ip_alarmdialog);
         final AlertDialog alertDialog = builder.create();
         alertDialog.show();
@@ -118,129 +337,6 @@ public class PassesFragment extends Fragment {
 
     }
 
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        this.setHasOptionsMenu(true);
-
-        mainActivity = (MainActivity) getActivity();
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
-        mainActivity.setTitle("Captures");
-
-        mNotificationReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                updateRecyclerView();
-                Log.d(TAG, "Broadcast received");
-            }
-        };
-    }
-
-    public boolean refreshJob() {
-        String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
-        if (ip == null) {
-            Log.d(TAG, "ip is null af (refreshJob)");
-            promptForIp();
-            return false;
-        } else {
-            JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
-            mJobScheduler.cancelAll();
-
-            PersistableBundle extras = new PersistableBundle();
-            extras.putString(FtpFragment.FTPIP_KEY, ip);
-
-            JobInfo.Builder mJobBuilder =
-                    new JobInfo.Builder(1,
-                            new ComponentName(mainActivity, Job.class))
-                            .setPersisted(true)
-                            .setExtras(extras)
-                            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-
-            int resultCode = mJobScheduler.schedule(mJobBuilder.build());
-            if (resultCode == JobScheduler.RESULT_SUCCESS) {
-                Log.d(TAG, "Jobs refreshed successfully");
-                return true;
-            } else {
-                Log.d(TAG, "Failed to refresh jobs");
-                return false;
-            }
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        mainActivity.registerReceiver(mNotificationReceiver, new IntentFilter("SATELLITE"));
-        updateRecyclerView();
-
-        if (sharedPreferences.getString(FtpFragment.FTPIP_KEY, null) == null) {
-            Log.d(TAG, "ip is null af (resume)");
-            if(!prompt_displayed) promptForIp();
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        mainActivity.unregisterReceiver(mNotificationReceiver);
-    }
-
-    private void buildRecyclerView() {
-        mRecyclerView.setHasFixedSize(true); //better performance
-        this.setCustomBackground();
-        mLayoutManager = new LinearLayoutManager(mainActivity);
-        ((LinearLayoutManager) mLayoutManager).setReverseLayout(true);
-        ((LinearLayoutManager) mLayoutManager).setStackFromEnd(true);
-        mRecyclerList = new ArrayList<>();
-        mAdapter = new RecyclerAdapter(mRecyclerList);
-        mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(mAdapter);
-        mAdapter.setOnItemClickListener(new RecyclerAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(int position) {
-                getImageFromRecyclerItem(mRecyclerList.get(position));
-            }
-        });
-
-        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder viewHolder1) {
-                return false;
-            }
-
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int i) {
-                removeRecyclerItem(viewHolder.getAdapterPosition());
-            }
-        }).attachToRecyclerView(mRecyclerView);
-    }
-
-    public void getImageFromRecyclerItem(RecyclerItem recyclerItem) {
-        String ftpIp = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
-        String ftpUsername = sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null);
-        String ftpPassword = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
-
-        if (ftpIp == null) {
-            promptForIp();
-        }
-        if (ftpPassword == null || ftpUsername == null) {
-            firstTimeFtpCredentials();
-        } else {
-            String image_name = getImageNameFromCapture(recyclerItem);
-            TextView textView = new TextView(mainActivity);
-            textView.setText(image_name);
-            AlertDialog alertDialog = new AlertDialog.Builder(mainActivity)
-                    .setTitle("Downloading...")
-                    .setView(textView)
-                    .setCancelable(false)
-                    .create();
-            alertDialog.show();
-
-            new DownloadTask(image_name, alertDialog).execute();
-        }
-    }
-
     public static String getGatewayIp(Context context) {
         WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
@@ -259,11 +355,11 @@ public class PassesFragment extends Fragment {
         );
     }
 
-    public void firstTimeFtpCredentials() {
+    private void firstTimeFtpCredentials() {
         final SharedPreferences.Editor editor = sharedPreferences.edit();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
-        builder.setTitle("First Time Setup of FTP Credentials");
+        builder.setTitle("First Time Setup: FTP");
         builder.setView(R.layout.ftp_credentials);
         final AlertDialog alertDialog = builder.create();
         alertDialog.show();
@@ -292,92 +388,39 @@ public class PassesFragment extends Fragment {
         });
     }
 
-    public void updateRecyclerView() {
 
-        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
-        if (stringList != null) {
-            Log.d(TAG, "Stringlist found");
-            Iterator<String> iterator = stringList.iterator();
-            while (iterator.hasNext()) {
-                String next = iterator.next();
-                parseStringListEntry(next);
-            }
-            mAdapter.notifyDataSetChanged();
-            mRecyclerView.smoothScrollToPosition(mAdapter.getItemCount());
+    private boolean refreshJob() {
+        String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+        if (ip == null) {
+            Log.d(TAG, "server_ip is null af (refreshJob)");
+            promptForIp();
+            return false;
         } else {
-            Log.d(TAG, "Stringlist not found");
-        }
+            JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
+            mJobScheduler.cancelAll();
 
-    }
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(FtpFragment.FTPIP_KEY, ip);
 
-    public void parseStringListEntry(String s) {
-        String satellite_name = s.substring(0, 6);
-        String concatTimeDate = s.substring(6, 18);
-        Iterator<RecyclerItem> itemIterator = mRecyclerList.iterator();
-        boolean found = false;
-        while (itemIterator.hasNext() && found == false) {
-            RecyclerItem next = itemIterator.next();
-            if (next.getText1().equals(satellite_name) && next.getText2().equals(concatTimeDate)) {
-                found = true;
-            }
-        }
-        if (found == false) {
-            mRecyclerView.smoothScrollToPosition(0);
-            mRecyclerList.add(new RecyclerItem(0, satellite_name, concatTimeDate));
-        }
-    }
+            JobInfo.Builder mJobBuilder =
+                    new JobInfo.Builder(1,
+                            new ComponentName(mainActivity, Job.class))
+                            .setPersisted(true)
+                            .setExtras(extras)
+                            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
 
-    public String getImageNameFromCapture(RecyclerItem capture) {
-        String image_name = "error.jpg";
-        String satelliteName = capture.getText1();
-        String concatTimeDate = capture.getText2();
-        String hours = concatTimeDate.substring(0, 2);
-        String minutes = concatTimeDate.substring(2, 4);
-        String seconds = concatTimeDate.substring(4, 6);
-        String year = concatTimeDate.substring(6, 8);
-        String month = concatTimeDate.substring(8, 10);
-        String day = concatTimeDate.substring(10, 12);
-
-        if (satelliteName.contains("NOAA")) {
-            image_name = satelliteName + "20" + year + month + day + "-" + hours + minutes + seconds + ".png";
-        } else if (satelliteName.contains("METEOR")) {
-            image_name = "METEOR-M220" + year + month + day + "-" + hours + minutes + seconds + ".png";
-        }
-
-        return image_name;
-    }
-
-    public void removeRecyclerItem(int position) {
-        RecyclerItem recyclerItem = mRecyclerList.get(position);
-        if (recyclerItem != null) {
-            String toBeRemoved_string = recyclerItem.getText1() + recyclerItem.getText2();
-            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
-            if (stringList != null) {
-                Iterator<String> iterator = stringList.iterator();
-                boolean found = false;
-                while (iterator.hasNext() && found == false) {
-                    String next = iterator.next();
-                    if (next.equals(toBeRemoved_string)) {
-                        iterator.remove();
-                        found = true;
-                        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
-                        Log.d(TAG, "Element removed from SharedPreferences");
-                    }
-                }
-                if (found == false) {
-                    Log.d(TAG, "Element not found in SharedPreferences");
-                }
+            int resultCode = mJobScheduler.schedule(mJobBuilder.build());
+            if (resultCode == JobScheduler.RESULT_SUCCESS) {
+                Log.d(TAG, "Jobs refreshed successfully");
+                return true;
             } else {
-                Log.d(TAG, "Stringlist not found");
+                Log.d(TAG, "Failed to refresh jobs");
+                return false;
             }
-
-            String image_name = getImageNameFromCapture(recyclerItem);
-            removeImageFromCache(image_name);
         }
-        (mAdapter).removeItem(position);
     }
 
-    public void removeImageFromCache(String image_name){
+    private void removeImageFromCache(String image_name) {
         String filePath = mainActivity.getFilesDir() + File.separator + image_name;
         File fileToBeDeleted = new File(filePath);
         try {
@@ -394,8 +437,23 @@ public class PassesFragment extends Fragment {
         }
     }
 
+    private void viewFile(String localPath) {
+        if (localPath == null) {
+            Toast.makeText(mainActivity, "FTP Error: check ftp settings otherwise check log for exception", Toast.LENGTH_LONG).show();
+        } else {
+            File imagePath = new File(localPath);
+            Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
 
-    class DownloadTask extends AsyncTask<String, Void, String> {
+            Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
+
+            galleryIntent.setDataAndType(uri, "image/*");
+            galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            mainActivity.startActivity(galleryIntent);
+        }
+    }
+
+
+    private class DownloadTask extends AsyncTask<String, Void, String> {
         private String image_name;
         private String local_path;
         private AlertDialog alertDialog;
@@ -416,79 +474,36 @@ public class PassesFragment extends Fragment {
                 if (!file.exists()) {
                     Log.d(TAG, "Download started");
                     easyFTP ftp = new easyFTP();
-                    ftp.connect(sharedPreferences.getString(FtpFragment.FTPIP_KEY, null), sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null), sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null));
-                    ftp.downloadFile(getString(R.string.path_of_images) + image_name, local_path);
-                    Log.d(TAG, "Download Successfull");
+                    String username = sharedPreferences.getString(FtpFragment.FTPUSER_KEY, null);
+                    String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+                    String password = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
+                    ftp.connect(ip, username, password);
+                    if(ftp.getFtpClient().isConnected()){
+                        if (ftp.getFtpClient().login(username, password)) {
+                            ftp.downloadFile(getString(R.string.path_of_images) + image_name, local_path);
+                            Log.d(TAG, "Download Successfull");
+                            return local_path;
+                        }
+                        else return null;
+                    }
+                    else return null;
                 }
-                alertDialog.dismiss();
-                return local_path;
+                else return local_path;
+
             } catch (Exception e) {
                 e.printStackTrace();
                 String t = "Failure : " + e.getLocalizedMessage();
                 Log.d(TAG, t);
                 return null;
             }
-
         }
 
         @Override
         protected void onPostExecute(String s) {
             mainActivity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
-            if (s != null) {
-                Log.d(TAG, "result: " + s);
-                viewFile(s);
-            }
+            alertDialog.dismiss();
+            Log.d(TAG, "result: " + s);
+            viewFile(s);
         }
-    }
-
-    public void removeAllCaptures() {
-        for(RecyclerItem recyclerItem : mRecyclerList){
-            removeImageFromCache(getImageNameFromCapture(recyclerItem));
-        }
-        mRecyclerList.clear();
-        ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
-        stringList.clear();
-        MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
-        mAdapter.notifyDataSetChanged();
-        Toast.makeText(mainActivity, "All captures deleted", Toast.LENGTH_SHORT).show();
-    }
-
-    public void setCustomBackground() {
-        mRecyclerView.setBackgroundResource(R.drawable.background_space1);
-        mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
-    }
-
-    @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        inflater.inflate(R.menu.passes_menu, menu);
-        super.onCreateOptionsMenu(menu, inflater);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-
-        int id = item.getItemId();
-
-        if (id == R.id.deleteAll) {
-            removeAllCaptures();
-        }
-        if (id == R.id.refreshButton) {
-            if (refreshJob()) {
-                Toast.makeText(mainActivity, "Manually refreshed jobs", Toast.LENGTH_SHORT);
-            }
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    public void viewFile(String localPath) {
-        File imagePath = new File(localPath);
-        Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
-
-        Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
-
-        galleryIntent.setDataAndType(uri, "image/*");
-        galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        mainActivity.startActivity(galleryIntent);
     }
 }

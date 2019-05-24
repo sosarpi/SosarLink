@@ -15,41 +15,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
     private ArrayList<RecyclerItem> mRecyclerList;
     private OnItemClickListener mListener;
 
-    public interface OnItemClickListener {
-        void onItemClick(int position);
-    }
-
-    public void setOnItemClickListener(OnItemClickListener listener){
-        mListener = listener;
-    }
-
-    public static class RecyclerViewHolder extends RecyclerView.ViewHolder {
-
-        public ImageView mImageView;
-        public TextView mTextView1;
-        public TextView mTextView2;
-
-        public RecyclerViewHolder(View itemView, final OnItemClickListener listener) {
-            super(itemView);
-            mImageView = itemView.findViewById(R.id.imageViewRecycler);
-            mTextView1 = itemView.findViewById(R.id.textViewRecycler);
-            mTextView2 = itemView.findViewById(R.id.textViewRecycler2);
-
-            itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if(listener != null) {
-                        int position = getAdapterPosition();
-                        if(position != RecyclerView.NO_POSITION) {
-                            listener.onItemClick(position);
-                        }
-                    }
-                }
-            });
-        }
-
-    }
-
     public RecyclerAdapter(ArrayList<RecyclerItem> recyclerList) {
         mRecyclerList = recyclerList;
     }
@@ -105,17 +70,51 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
         recyclerViewHolder.mTextView2.setText(hours + ":" + minutes + ":" + seconds + "\t" + day + "/" + month + "/" + year);
     }
 
-    public void removeItem(int position) {
-        mRecyclerList.remove(position);
-        notifyItemRemoved(position);
-    }
-
     @Override
     public int getItemCount() {
         return mRecyclerList.size();
     }
 
-    public ArrayList<RecyclerItem> getmRecyclerList() {
-        return mRecyclerList;
+
+
+    public void setOnItemClickListener(OnItemClickListener listener){
+        mListener = listener;
+    }
+
+    public void removeItemAtPosition(int position) {
+        mRecyclerList.remove(position);
+        notifyItemRemoved(position);
+    }
+
+
+    public static class RecyclerViewHolder extends RecyclerView.ViewHolder {
+
+        public ImageView mImageView;
+        public TextView mTextView1;
+        public TextView mTextView2;
+
+        public RecyclerViewHolder(View itemView, final OnItemClickListener listener) {
+            super(itemView);
+            mImageView = itemView.findViewById(R.id.imageViewRecycler);
+            mTextView1 = itemView.findViewById(R.id.textViewRecycler);
+            mTextView2 = itemView.findViewById(R.id.textViewRecycler2);
+
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if(listener != null) {
+                        int position = getAdapterPosition();
+                        if(position != RecyclerView.NO_POSITION) {
+                            listener.onItemClick(position);
+                        }
+                    }
+                }
+            });
+        }
+
+    }
+
+    public interface OnItemClickListener {
+        void onItemClick(int position);
     }
 }

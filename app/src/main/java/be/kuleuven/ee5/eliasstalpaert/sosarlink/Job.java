@@ -4,7 +4,6 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.TaskStackBuilder;
 import android.app.job.JobInfo;
 import android.app.job.JobParameters;
 import android.app.job.JobScheduler;
@@ -12,34 +11,37 @@ import android.app.job.JobService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.PersistableBundle;
-import android.preference.PreferenceManager;
 import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
 
 public class Job extends JobService {
     private static final String TAG = Job.class.getSimpleName();
     private static final int INTERVAL = 5;
 
-    JobParameters mParams;
-    String ip;
+    private JobParameters mParams;
+    private String server_ip;
 
     //onStartJob called when job launched
     @Override
     public boolean onStartJob(JobParameters params) {
         Log.d(TAG, "Job started");
         this.mParams = params;
-        this.ip = params.getExtras().getString(FtpFragment.FTPIP_KEY);
+        this.server_ip = params.getExtras().getString(FtpFragment.FTPIP_KEY);
         scheduleRefresh();
         doBackGroundWork(params);
 
+        return true;
+    }
+
+    @Override
+    public boolean onStopJob(JobParameters params) {
+        Log.d(TAG, "Job cancelled before completion");
+        jobFinished(params, false);
         return true;
     }
 
@@ -48,8 +50,8 @@ public class Job extends JobService {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new ConnectTask(getApplicationContext(), ip).execute("");
-                Log.d(TAG, "AsyncTask started");
+                new ConnectTask(getApplicationContext(), server_ip).execute("");
+                Log.d(TAG, "ConnectTask started");
             }
         }).start();
     }
@@ -64,7 +66,7 @@ public class Job extends JobService {
                         new ComponentName(this,
                                 Job.class));
         PersistableBundle extras = new PersistableBundle();
-        extras.putString(FtpFragment.FTPIP_KEY, this.ip);
+        extras.putString(FtpFragment.FTPIP_KEY, this.server_ip);
 
         mJobBuilder
                 .setMinimumLatency(INTERVAL * 60 * 1000) //tijdsinterval
@@ -80,40 +82,33 @@ public class Job extends JobService {
         }
     }
 
-    @Override
-    public boolean onStopJob(JobParameters params) {
-        Log.d(TAG, "Job cancelled before completion");
-        jobFinished(params, false);
-        return true;
-    }
+    private class ConnectTask extends AsyncTask<String, String, TcpClient> {
 
-    protected class ConnectTask extends AsyncTask<String, String, TcpClient> {
+        private Context mContext;
+        private NotificationManager mNotificationManager;
+        private NotificationChannel mNotificationChannel;
+        private int numberOfReceivedParts;
+        private String satellite_name, satellite_time, satellite_date;
+        int notificationID;
+        boolean fullCaptureReceived;
 
-        Context mContext;
-        NotificationManager NM;
-        NotificationChannel mChannel;
-        int number;
-        String name, time, date;
-        int notifyID;
-        boolean captureReceived;
+        private String server_ip;
 
-        private String ip;
-
-        ConnectTask(Context mContext, String ip) {
+        ConnectTask(Context mContext, String server_ip) {
             super();
             this.mContext = mContext;
-            this.ip = ip;
-            this.notifyID = 0;
-            this.captureReceived = false;
+            this.server_ip = server_ip;
+            this.notificationID = 0;
+            this.fullCaptureReceived = false;
 
-            NM = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            mNotificationManager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                String CHANNEL_ID = "my_channel_01";// The id of the channel.
-                CharSequence name = "nChannelSosarlink";// The user-visible name of the channel.
+                String CHANNEL_ID = BuildConfig.APPLICATION_ID + ".notificationchannel";// The id of the channel.
+                CharSequence name = "Picture Notification Channel";// The user-visible satellite_name of the channel.
                 int importance = NotificationManager.IMPORTANCE_HIGH;
-                this.mChannel = new NotificationChannel(CHANNEL_ID, name, importance);
-                NM.createNotificationChannel(mChannel);
+                this.mNotificationChannel = new NotificationChannel(CHANNEL_ID, name, importance);
+                mNotificationManager.createNotificationChannel(mNotificationChannel);
             }
 
         }
@@ -138,7 +133,7 @@ public class Job extends JobService {
                     //this method calls the onProgressUpdate
                     publishProgress(message);
                 }
-            }, this.ip);
+            }, this.server_ip,getApplicationContext());
 
             mTcpClient.run();
 
@@ -150,60 +145,59 @@ public class Job extends JobService {
             super.onProgressUpdate(values);
             //process server response here....
             if (values[0].contains("yes")) {
-                number = 0;
+                numberOfReceivedParts = 0;
             } else if (!values[0].contains("no")) {
-                if (number == 0) {
-                    name = new String(values[0]);
-                    number++;
-                } else if (number == 1) {
-                    time = new String(values[0]);
-                    number++;
-                } else if (number == 2) {
-                    date = new String(values[0]);
-                    number++;
+                if (numberOfReceivedParts == 0) {
+                    satellite_name = new String(values[0]);
+                    numberOfReceivedParts++;
+                } else if (numberOfReceivedParts == 1) {
+                    satellite_time = new String(values[0]);
+                    numberOfReceivedParts++;
+                } else if (numberOfReceivedParts == 2) {
+                    satellite_date = new String(values[0]);
+                    numberOfReceivedParts++;
                 }
-            } else if(values[0].contains("no")) {
-                if(captureReceived) {
+            } else if (values[0].contains("no")) {
+                if (fullCaptureReceived) {
                     Intent new_satellite = new Intent("SATELLITE");
                     sendBroadcast(new_satellite);
-                    captureReceived = false;
+                    fullCaptureReceived = false;
                 }
-                number = 0;
+                numberOfReceivedParts = 0;
             }
-            if (number >= 3) {
-                String pref_message = name + time + date;
+            if (numberOfReceivedParts >= 3) {
+                String pref_message = satellite_name + satellite_time + satellite_date;
                 if (pref_message.length() >= 18) { //correcte format?
                     updateSharedPreferences(pref_message); //write to shared application preferences
-                    switch (name) {
+                    switch (satellite_name) {
                         case "NOAA15":
-                            name = "NOAA-15";
+                            satellite_name = "NOAA-15";
                             break;
                         case "NOAA18":
-                            name = "NOAA-18";
+                            satellite_name = "NOAA-18";
                             break;
                         case "NOAA19":
-                            name = "NOAA-19";
+                            satellite_name = "NOAA-19";
                             break;
                         case "METEOR":
-                            name = "METEOR-M N2";
+                            satellite_name = "METEOR-M N2";
                             break;
                         default:
-                            name = "ERROR";
+                            satellite_name = "ERROR";
                     }
 
-                    Log.d("ConnectTask","New capture");
-                    String nMessage = name + " at " + time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + time.substring(4, 6)
-                            + " on " + date.substring(0, 2) + "/" + date.substring(2, 4) + "/" + date.substring(4, 6);
+                    String nMessage = satellite_name + " at " + satellite_time.substring(0, 2) + ":" + satellite_time.substring(2, 4) + ":" + satellite_time.substring(4, 6)
+                            + " on " + satellite_date.substring(0, 2) + "/" + satellite_date.substring(2, 4) + "/" + satellite_date.substring(4, 6);
                     pushNotification(nMessage); //push notifications to user
+                    fullCaptureReceived = true;
                 }
-                captureReceived = true;
-                number = 0;
+                numberOfReceivedParts = 0;
             }
 
         }
 
-        public void pushNotification(String nMessage) {
-            Intent intent = new Intent(getApplicationContext(),MainActivity.class);
+        private void pushNotification(String nMessage) {
+            Intent intent = new Intent(getApplicationContext(), MainActivity.class);
             PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, intent, 0);
 
             Notification.Builder notificationBuilder = new Notification.Builder(mContext)
@@ -214,32 +208,32 @@ public class Job extends JobService {
                     .setSmallIcon(R.mipmap.ic_sosarlogo);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                notificationBuilder.setChannelId(mChannel.getId());
-                NM.notify(notifyID, notificationBuilder.build());
+                notificationBuilder.setChannelId(mNotificationChannel.getId());
+                mNotificationManager.notify(notificationID, notificationBuilder.build());
             } else {
-                NM.notify(notifyID, notificationBuilder.build());
+                mNotificationManager.notify(notificationID, notificationBuilder.build());
             }
-            notifyID++;
+            notificationID++;
         }
 
-        public void updateSharedPreferences(String pref_message) {
-            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME,getApplicationContext());
+        private void updateSharedPreferences(String pref_message) {
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, getApplicationContext());
             if (stringList == null) {
                 stringList = new ArrayList<>();
             }
             Iterator<String> iterator = stringList.iterator();
             boolean found = false;
-            while(iterator.hasNext() && !found) {
+            while (iterator.hasNext() && !found) {
                 String next = iterator.next();
-                if(next.equals(pref_message)) {
+                if (next.equals(pref_message)) {
                     found = true;
                 }
             }
-            if(!found) {
+            if (!found) {
                 stringList.add(pref_message);
                 Log.d(TAG, "New string added to sharedpreferences");
             }
-            MainActivity.saveArrayList(stringList,MainActivity.LIST_NAME,getApplicationContext());
+            MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, getApplicationContext());
         }
     }
 }

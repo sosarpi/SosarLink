@@ -1,9 +1,5 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
-import android.app.TaskStackBuilder;
-import android.app.job.JobInfo;
-import android.app.job.JobScheduler;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
@@ -16,8 +12,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 
 import com.google.gson.Gson;
@@ -60,13 +54,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     }
 
-    public NavigationView getmNavigationView() {
-        return mNavigationView;
-    }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
+    public void onBackPressed() {
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override
@@ -83,6 +78,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    public NavigationView getNavigationView() {
+        return mNavigationView;
     }
 
     public static void saveArrayList(ArrayList<String> list, String key, Context context){
@@ -104,14 +103,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return gson.fromJson(json, type);
     }
 
-    @Override
-    public void onBackPressed() {
-        if (drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
-        }
-    }
+
 
 }
 

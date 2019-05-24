@@ -1,7 +1,8 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
+import android.content.Context;
 import android.util.Log;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -20,7 +21,7 @@ public class TcpClient {
     // message to send to the server
     private String mServerMessage;
     // sends message received notifications
-    private OnMessageReceived mMessageListener = null;
+    private OnMessageReceived mMessageListener;
     // while this is true, the server will continue running
     private boolean mRun = false;
     // used to send messages
@@ -29,13 +30,15 @@ public class TcpClient {
     private BufferedReader mBufferIn;
 
     private String serverIp;
+    private Context context;
 
     /**
      * Constructor of the class. OnMessagedReceived listens for the messages received from server
      */
-    public TcpClient(OnMessageReceived listener, String ip) {
+    public TcpClient(OnMessageReceived listener, String ip, Context context) {
         this.serverIp = ip;
-        mMessageListener = listener;
+        this.context = context;
+        this.mMessageListener = listener;
     }
 
     /**
@@ -139,7 +142,7 @@ public class TcpClient {
     //Declare the interface. The method messageReceived(String message) will must be implemented in the Activity
     //class at on AsyncTask doInBackground
     public interface OnMessageReceived {
-        public void messageReceived(String message);
+        void messageReceived(String message);
     }
 
 }
