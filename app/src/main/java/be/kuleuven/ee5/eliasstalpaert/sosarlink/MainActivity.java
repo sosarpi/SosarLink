@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     //Method made static in order to let the PollingJob.ConnectTask access the StringList contained in the SharedPreferences of the app (which it cannot access)
-    public static void saveArrayList(ArrayList<String> list, String key, Context context){
+    public static void saveArrayList(ArrayList<String> list, String key, Context context) {
         //In order to save the ArrayList to the SharedPreferences, we have to serialize it into the JSON-format
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         SharedPreferences.Editor editor = prefs.edit();
@@ -84,14 +84,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         editor.apply();
         Log.d(TAG, "ArrayList saved");
     }
+
     //Same reason as for the method above
-    public static ArrayList<String> getArrayList(String key, Context context){
+    public static ArrayList<String> getArrayList(String key, Context context) {
         //Deserialize the ArrayList from the JSON-format
         Log.d(TAG, "Trying to receive ArrayList");
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         Gson gson = new Gson();
         String json = prefs.getString(key, null);
-        Type type = new TypeToken<ArrayList<String>>() {}.getType();
+        Type type = new TypeToken<ArrayList<String>>() {
+        }.getType();
         return gson.fromJson(json, type);
     }
 
@@ -126,7 +128,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return navigationView;
     }
 
-    private void setupGeneralUI(){
+    private void setupGeneralUI() {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 

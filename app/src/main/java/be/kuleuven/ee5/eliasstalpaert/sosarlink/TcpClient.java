@@ -48,7 +48,7 @@ public class TcpClient {
         serverMessage = null;
     }
 
-    public void run(){
+    public void run() {
 
         run = true;
         Socket socket = new Socket();
@@ -66,7 +66,7 @@ public class TcpClient {
             socket.setSoTimeout(timeout);
             socket.connect(address, timeout);
 
-            if(socket.isConnected()){
+            if (socket.isConnected()) {
                 try {
 
                     // Sends the message to the server
@@ -79,7 +79,7 @@ public class TcpClient {
                     // In this while-loop we listen for messages from the server as long as the server is running
                     while (run) {
 
-                        if(bufferIn.ready()){
+                        if (bufferIn.ready()) {
                             serverMessage = bufferIn.readLine();
                             serverMessage = bufferIn.readLine();
                         }
@@ -89,26 +89,23 @@ public class TcpClient {
                             messageListener.messageReceived(serverMessage);
                             Log.d(TAG, "S: Received Message: '" + serverMessage + "'");
                             // When a 'no' is received, there won't be anymore messages coming from the server, so the client can be closed
-                            if(serverMessage.contains("no")) {
+                            if (serverMessage.contains("no")) {
                                 stopClient();
                                 Log.d(TAG, "C: Socket Closed");
                             }
                         }
 
                     }
-                }
-                catch (SocketTimeoutException e) {
+                } catch (SocketTimeoutException e) {
                     Log.e("TCP", "S: socket timed out");
                     stopClient();
-                }
-                finally {
+                } finally {
                     // The socket must be closed. It is not possible to reconnect to this socket
                     // after it is closed, which means a new socket instance has to be created.
                     socket.close();
                     Log.e("TCP", "S: socket closed");
                 }
-            }
-            else {
+            } else {
                 stopClient();
                 socket.close();
                 Log.e("TCP", "S: no connection");
@@ -118,14 +115,12 @@ public class TcpClient {
             stopClient();
             try {
                 socket.close();
-            }
-            catch(Exception socket_e) {
+            } catch (Exception socket_e) {
                 Log.e("TCP", "C: Error", socket_e);
             }
             Log.e("TCP", "S: no connection");
             Log.e("TCP", "S: socket closed");
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             Log.e("TCP", "C: Error", e);
         }
     }

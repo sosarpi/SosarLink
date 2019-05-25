@@ -35,7 +35,6 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -161,7 +160,6 @@ public class CapturesFragment extends Fragment {
     }
 
 
-
     private AlertDialog buildAlertDialog(String title, int layoutId) {
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setTitle(title);
@@ -169,7 +167,6 @@ public class CapturesFragment extends Fragment {
         builder.setView(layoutId);
         return builder.create();
     }
-
 
 
     private void setupRecyclerView() {
@@ -326,7 +323,7 @@ public class CapturesFragment extends Fragment {
     }
 
     private void removeAllRecyclerItems() {
-        if(recyclerList.size() > 0){
+        if (recyclerList.size() > 0) {
             for (RecyclerItem recyclerItem : recyclerList) {
                 removeImageFromStorage(getImageNameFromRecyclerItem(recyclerItem));
             }
@@ -336,7 +333,7 @@ public class CapturesFragment extends Fragment {
         }
 
         ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
-        if(stringList != null){
+        if (stringList != null) {
             stringList.clear();
             MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mainActivity);
 
@@ -470,8 +467,7 @@ public class CapturesFragment extends Fragment {
             String ip = sharedPreferences.getString(SettingsFragment.IP_KEY, null);
             if (ip == null) {
                 promptServerIp();
-            }
-            else {
+            } else {
                 if (pollingInterval <= 0) {
                     pollingInterval = CapturesFragment.DEFAULT_POLLING_INTERVAL;
                     sharedPreferencesEditor.putInt(CapturesFragment.POLLING_INTERVAL_KEY, CapturesFragment.DEFAULT_POLLING_INTERVAL).apply();
@@ -499,8 +495,7 @@ public class CapturesFragment extends Fragment {
                     Log.d(TAG, "Failed to refresh jobs");
                 }
             }
-        }
-        else {
+        } else {
             jobScheduler.cancelAll();
             Log.d(TAG, "Canceled all jobs");
         }
@@ -552,7 +547,7 @@ public class CapturesFragment extends Fragment {
                     if (ftp.getFtpClient().isConnected()) {
 
                         if (ftp.getFtpClient().login(username, password)) {
-                            ftp.downloadFile(CapturesFragment.REMOTE_IMAGES_DIRECTORY + File.separator +  imageName, localPath);
+                            ftp.downloadFile(CapturesFragment.REMOTE_IMAGES_DIRECTORY + File.separator + imageName, localPath);
                             return localPath;
                         } else return null;
 

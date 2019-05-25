@@ -76,8 +76,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
     }
 
 
-
-    public void setOnItemClickListener(OnItemClickListener listener){
+    public void setOnItemClickListener(OnItemClickListener listener) {
         this.onItemClickListener = listener;
     }
 
@@ -102,9 +101,9 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Recycl
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    if(listener != null) {
+                    if (listener != null) {
                         int position = getAdapterPosition();
-                        if(position != RecyclerView.NO_POSITION) {
+                        if (position != RecyclerView.NO_POSITION) {
                             listener.onItemClick(position);
                         }
                     }

@@ -74,7 +74,7 @@ public class SettingsFragment extends Fragment {
         refreshUIData();
     }
 
-    private void refreshUIData(){
+    private void refreshUIData() {
         String username = sharedPreferences.getString(SettingsFragment.FTPUSER_KEY, null);
         String password = sharedPreferences.getString(SettingsFragment.FTPPASS_KEY, null);
         String server_ip = sharedPreferences.getString(SettingsFragment.IP_KEY, null);
@@ -99,7 +99,7 @@ public class SettingsFragment extends Fragment {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if(id == R.id.setDefaultIp) setDefaultIP();
+        if (id == R.id.setDefaultIp) setDefaultIP();
 
         return super.onOptionsItemSelected(item);
     }
@@ -118,14 +118,14 @@ public class SettingsFragment extends Fragment {
         String password = passEdit.getText().toString();
         if (!mainActivity.hasAlphanumeric(password)) password = null;
         String ip_address = ipEdit.getText().toString();
-        if (mainActivity.isAnIpv4Address(ip_address)){
+        if (mainActivity.isAnIpv4Address(ip_address)) {
             sharedPreferencesEditor.putString(FTPUSER_KEY, username);
             sharedPreferencesEditor.putString(FTPPASS_KEY, password);
             sharedPreferencesEditor.putString(IP_KEY, ip_address);
             sharedPreferencesEditor.apply();
             Toast.makeText(mainActivity, "Settings updated", Toast.LENGTH_SHORT).show();
-        }
-        else Toast.makeText(mainActivity, "Failed: Enter a valid IP to save settings", Toast.LENGTH_LONG).show();
+        } else
+            Toast.makeText(mainActivity, "Failed: Enter a valid IP to save settings", Toast.LENGTH_LONG).show();
     }
 
 }

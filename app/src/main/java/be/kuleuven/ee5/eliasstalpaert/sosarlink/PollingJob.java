@@ -59,7 +59,6 @@ public class PollingJob extends JobService {
     }
 
 
-
     //Schedules the next job with appropriate latency according to the set polling interval (can't do this using JobScheduler because the defined minimum is 15 minutes)
     private void scheduleRefresh() {
         JobScheduler jobScheduler = (JobScheduler) getApplicationContext()
@@ -141,14 +140,13 @@ public class PollingJob extends JobService {
             super.onProgressUpdate(values);
 
             /*
-            * Meaning of the values:
-            * 'yes': means there are captures present in the log file in the server and will be sent next
-            * 'no': means there are no captures available (anymore)
+             * Meaning of the values:
+             * 'yes': means there are captures present in the log file in the server and will be sent next
+             * 'no': means there are no captures available (anymore)
              */
             if (values[0].contains("yes")) {
                 numberOfReceivedParts = 0;
-            }
-            else if (values[0].contains("no")) {
+            } else if (values[0].contains("no")) {
                 // If 1 or more captures were received, the BroadcastReceiver of the PassesFragment is informed (which then updates the RecyclerView)
                 if (captureReceived) {
                     Intent newCaptureBroadcast = new Intent("SATELLITE");
@@ -156,8 +154,7 @@ public class PollingJob extends JobService {
                     captureReceived = false;
                 }
                 numberOfReceivedParts = 0;
-            }
-            else {
+            } else {
                 // Every capture entry exists of 3 parts
                 if (numberOfReceivedParts == 0) {
                     satelliteName = values[0];
