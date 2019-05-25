@@ -12,92 +12,92 @@ import java.util.ArrayList;
 
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.RecyclerViewHolder> {
 
-    private ArrayList<RecyclerItem> mRecyclerList;
-    private OnItemClickListener mListener;
+    private ArrayList<RecyclerItem> recyclerList;
+    private OnItemClickListener onItemClickListener;
 
     public RecyclerAdapter(ArrayList<RecyclerItem> recyclerList) {
-        mRecyclerList = recyclerList;
+        this.recyclerList = recyclerList;
     }
 
     @NonNull
     @Override
     public RecyclerViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
-        View v = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.example_item, viewGroup, false);
-        RecyclerViewHolder rvh = new RecyclerViewHolder(v, mListener);
-        return rvh;
+        View v = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.recycler_item, viewGroup, false);
+        return new RecyclerViewHolder(v, onItemClickListener);
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerViewHolder recyclerViewHolder, int i) {
-        RecyclerItem currentItem = mRecyclerList.get(i);
+        RecyclerItem currentItem = recyclerList.get(i);
 
-        int image_resource;
+        int imageResource;
 
-        String satellite_name = currentItem.getText1();
-        switch (satellite_name) {
+        String satelliteName = currentItem.getSatelliteName();
+        switch (satelliteName) {
             case "NOAA15":
-                satellite_name = "NOAA-15";
-                image_resource = R.drawable.noaa_iconv2;
+                satelliteName = "NOAA-15";
+                imageResource = R.drawable.noaa_iconv2;
                 break;
             case "NOAA18":
-                satellite_name = "NOAA-18";
-                image_resource = R.drawable.noaa_iconv2;
+                satelliteName = "NOAA-18";
+                imageResource = R.drawable.noaa_iconv2;
                 break;
             case "NOAA19":
-                satellite_name = "NOAA-19";
-                image_resource = R.drawable.noaa_iconv2;
+                satelliteName = "NOAA-19";
+                imageResource = R.drawable.noaa_iconv2;
                 break;
             case "METEOR":
-                satellite_name = "METEOR-M N2";
-                image_resource = R.drawable.meteorv4;
+                satelliteName = "METEOR-M N2";
+                imageResource = R.drawable.meteorv4;
                 break;
             default:
-                satellite_name = "ERROR";
-                image_resource = R.mipmap.ic_sosarlogo;
+                satelliteName = "ERROR";
+                imageResource = R.drawable.ic_error;
                 break;
         }
 
-        recyclerViewHolder.mImageView.setImageResource(image_resource);
+        recyclerViewHolder.imageView.setImageResource(imageResource);
+        recyclerViewHolder.satelliteName.setText(satelliteName);
 
-        recyclerViewHolder.mTextView1.setText(satellite_name);
-        String concatTimeDate = currentItem.getText2();
+        String concatTimeDate = currentItem.getTimeDate();
         String hours = concatTimeDate.substring(0, 2);
         String minutes = concatTimeDate.substring(2, 4);
         String seconds = concatTimeDate.substring(4, 6);
         String year = concatTimeDate.substring(6, 8);
         String month = concatTimeDate.substring(8, 10);
         String day = concatTimeDate.substring(10, 12);
-        recyclerViewHolder.mTextView2.setText(hours + ":" + minutes + ":" + seconds + "\t" + day + "/" + month + "/" + year);
+
+        recyclerViewHolder.timeDate.setText(hours + ":" + minutes + ":" + seconds + "\t\t" + day + "/" + month + "/" + year);
     }
 
     @Override
     public int getItemCount() {
-        return mRecyclerList.size();
+        return recyclerList.size();
     }
 
 
 
     public void setOnItemClickListener(OnItemClickListener listener){
-        mListener = listener;
+        this.onItemClickListener = listener;
     }
 
     public void removeItemAtPosition(int position) {
-        mRecyclerList.remove(position);
+        recyclerList.remove(position);
         notifyItemRemoved(position);
     }
 
 
     public static class RecyclerViewHolder extends RecyclerView.ViewHolder {
 
-        public ImageView mImageView;
-        public TextView mTextView1;
-        public TextView mTextView2;
+        public ImageView imageView;
+        public TextView satelliteName;
+        public TextView timeDate;
 
         public RecyclerViewHolder(View itemView, final OnItemClickListener listener) {
             super(itemView);
-            mImageView = itemView.findViewById(R.id.imageViewRecycler);
-            mTextView1 = itemView.findViewById(R.id.textViewRecycler);
-            mTextView2 = itemView.findViewById(R.id.textViewRecycler2);
+            imageView = itemView.findViewById(R.id.imageViewRecycler);
+            satelliteName = itemView.findViewById(R.id.textViewRecycler);
+            timeDate = itemView.findViewById(R.id.textViewRecycler2);
 
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override

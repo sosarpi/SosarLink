@@ -2,6 +2,8 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.DhcpInfo;
+import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
@@ -19,13 +21,15 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static final String TAG = MainActivity.class.getSimpleName();
     public static final String LIST_NAME = "satellite";
 
     private DrawerLayout drawer;
-    private NavigationView mNavigationView;
+    private NavigationView navigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,24 +40,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         editor.clear();
         editor.apply();
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-
-        mNavigationView = findViewById(R.id.nav_view);
-        mNavigationView.setNavigationItemSelectedListener(this);
-
+        navigationView = findViewById(R.id.nav_view);
         drawer = findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar,
-                R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.addDrawerListener(toggle);
-        toggle.syncState();
+        setupGeneralUI();
 
         getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                new PassesFragment()).commit();
-        mNavigationView.setCheckedItem(R.id.nav_passes);
+                new CapturesFragment()).commit();
+        navigationView.setCheckedItem(R.id.nav_passes);
 
     }
-
 
     @Override
     public void onBackPressed() {
@@ -69,19 +64,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         switch (menuItem.getItemId()) {
             case R.id.nav_ftp:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                        new FtpFragment()).commit();
+                        new SettingsFragment()).commit();
                 break;
             case R.id.nav_passes:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                        new PassesFragment()).commit();
+                        new CapturesFragment()).commit();
         }
 
         drawer.closeDrawer(GravityCompat.START);
         return true;
-    }
-
-    public NavigationView getNavigationView() {
-        return mNavigationView;
     }
 
     public static void saveArrayList(ArrayList<String> list, String key, Context context){
@@ -103,7 +94,46 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return gson.fromJson(json, type);
     }
 
+    public boolean hasAlphanumeric(String s) {
+        return s.matches(".*\\w.*");
+    }
 
+    public boolean isAnIpv4Address(String text) {
+        Pattern p = Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+        Matcher m = p.matcher(text);
+        return m.find();
+    }
 
+    public String getGatewayIp() {
+        WifiManager wifiManager = (WifiManager) this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
+        return formatIP(dhcpInfo.gateway);
+    }
+
+    private String formatIP(int ip) {
+        return String.format(
+                "%d.%d.%d.%d",
+                (ip & 0xff),
+                (ip >> 8 & 0xff),
+                (ip >> 16 & 0xff),
+                (ip >> 24 & 0xff)
+        );
+    }
+
+    public NavigationView getNavigationView() {
+        return navigationView;
+    }
+
+    private void setupGeneralUI(){
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
+
+        navigationView.setNavigationItemSelectedListener(this);
+
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar,
+                R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        drawer.addDrawerListener(toggle);
+        toggle.syncState();
+    }
 }
 

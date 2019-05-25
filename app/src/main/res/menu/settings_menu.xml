@@ -3,6 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/setDefaultIp"
-        android:title="Set IP to default gateway"
+        android:title="@string/set_ip_to_default"
         app:showAsAction="never"/>
 </menu>

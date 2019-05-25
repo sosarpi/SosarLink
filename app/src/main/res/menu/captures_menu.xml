@@ -3,15 +3,16 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/deleteAllMenu"
-        android:title="Delete all"
+        android:title="@string/delete_all"
         app:showAsAction="never" />
     <item
         android:id="@+id/jobSettingsMenu"
-        android:title="Change polling settings"
+        android:title="@string/polling_settings"
         app:showAsAction="never" />
     <item
         android:id="@+id/refreshButton"
         android:icon="@drawable/ic_refresh"
-        android:title="Refresh"
-        app:showAsAction="always" />
+        android:color="@color/spaceAccent"
+        android:title="@string/refresh"
+        app:showAsAction="ifRoom" />
 </menu>

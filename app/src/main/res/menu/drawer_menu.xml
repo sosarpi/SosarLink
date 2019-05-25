@@ -7,11 +7,11 @@
         <item
             android:id="@+id/nav_passes"
             android:icon="@drawable/ic_satellite"
-            android:title="Captures" />
+            android:title="@string/captures" />
         <item
             android:id="@+id/nav_ftp"
-            android:icon="@drawable/ic_ftp"
-            android:title="FTP Settings" />
+            android:icon="@drawable/ic_settings"
+            android:title="@string/network_settings" />
     </group>
 
 </menu>

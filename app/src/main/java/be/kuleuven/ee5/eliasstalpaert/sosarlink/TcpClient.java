@@ -2,7 +2,6 @@ package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
 import android.content.Context;
 import android.util.Log;
-import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -17,51 +16,49 @@ import java.net.SocketTimeoutException;
 public class TcpClient {
 
     private static final String TAG = TcpClient.class.getSimpleName();
-    public static final int SERVER_PORT = 5678;
+    private static final int SERVER_PORT = 5678;
     // message to send to the server
-    private String mServerMessage;
+    private String serverMessage;
     // sends message received notifications
-    private OnMessageReceived mMessageListener;
+    private OnMessageReceived messageListener;
     // while this is true, the server will continue running
-    private boolean mRun = false;
+    private boolean run = false;
     // used to send messages
-    private PrintWriter mBufferOut;
+    private PrintWriter bufferOut;
     // used to read messages from the server
-    private BufferedReader mBufferIn;
+    private BufferedReader bufferIn;
 
     private String serverIp;
-    private Context context;
 
     /**
      * Constructor of the class. OnMessagedReceived listens for the messages received from server
      */
-    public TcpClient(OnMessageReceived listener, String ip, Context context) {
+    public TcpClient(OnMessageReceived listener, String ip) {
         this.serverIp = ip;
-        this.context = context;
-        this.mMessageListener = listener;
+        this.messageListener = listener;
     }
 
     /**
      * Close the connection and release the members
      */
-    public void stopClient() {
+    private void stopClient() {
 
-        mRun = false;
+        run = false;
 
-        if (mBufferOut != null) {
-            mBufferOut.flush();
-            mBufferOut.close();
+        if (bufferOut != null) {
+            bufferOut.flush();
+            bufferOut.close();
         }
 
-        mMessageListener = null;
-        mBufferIn = null;
-        mBufferOut = null;
-        mServerMessage = null;
+        messageListener = null;
+        bufferIn = null;
+        bufferOut = null;
+        serverMessage = null;
     }
 
     public void run(){
 
-        mRun = true;
+        run = true;
         Socket socket = new Socket();
 
         try {
@@ -80,25 +77,25 @@ public class TcpClient {
                 try {
 
                     //sends the message to the server
-                    mBufferOut = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+                    bufferOut = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
 
                     //receives the message which the server sends back
-                    mBufferIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    bufferIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
 
                     //in this while the client listens for the messages sent by the server
-                    while (mRun) {
+                    while (run) {
 
-                        if(mBufferIn.ready()){
-                            mServerMessage = mBufferIn.readLine();
-                            mServerMessage = mBufferIn.readLine();
+                        if(bufferIn.ready()){
+                            serverMessage = bufferIn.readLine();
+                            serverMessage = bufferIn.readLine();
                         }
 
-                        if (mServerMessage != null && mMessageListener != null) {
+                        if (serverMessage != null && messageListener != null) {
                             //call the method messageReceived from MyActivity class
-                            mMessageListener.messageReceived(mServerMessage);
-                            Log.d(TAG, "S: Received Message: '" + mServerMessage + "'");
-                            if(mServerMessage.contains("no")) {
+                            messageListener.messageReceived(serverMessage);
+                            Log.d(TAG, "S: Received Message: '" + serverMessage + "'");
+                            if(serverMessage.contains("no")) {
                                 stopClient();
                                 Log.d(TAG, "C: Socket Closed");
                             }

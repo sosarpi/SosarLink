@@ -22,7 +22,6 @@
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_toEndOf="@+id/imageViewRecycler"
-            android:text="Line 1"
             android:textColor="@android:color/black"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -30,7 +29,6 @@
             android:id="@+id/textViewRecycler2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Line 2"
             android:layout_below="@+id/textViewRecycler"
             android:layout_toEndOf="@id/imageViewRecycler"
             android:layout_marginStart="8dp"
