@@ -1,6 +1,5 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
-import android.content.Context;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -17,30 +16,23 @@ public class TcpClient {
 
     private static final String TAG = TcpClient.class.getSimpleName();
     private static final int SERVER_PORT = 5678;
-    // message to send to the server
     private String serverMessage;
-    // sends message received notifications
     private OnMessageReceived messageListener;
-    // while this is true, the server will continue running
     private boolean run = false;
-    // used to send messages
+    // Used to send messages
     private PrintWriter bufferOut;
-    // used to read messages from the server
+    // Used to read messages from the server
     private BufferedReader bufferIn;
 
     private String serverIp;
 
-    /**
-     * Constructor of the class. OnMessagedReceived listens for the messages received from server
-     */
+    // The messageListener listens for messages received from the server
     public TcpClient(OnMessageReceived listener, String ip) {
         this.serverIp = ip;
         this.messageListener = listener;
     }
 
-    /**
-     * Close the connection and release the members
-     */
+    // Close connection and release its member variables
     private void stopClient() {
 
         run = false;
@@ -62,13 +54,14 @@ public class TcpClient {
         Socket socket = new Socket();
 
         try {
-            //here you must put your computer's IP address.
+            // Gets the server address
             InetAddress serverAddr = InetAddress.getByName(this.serverIp);
 
             Log.d(TAG, "C: Connecting...");
 
-            //create a socket to make the connection with the server
+            // Create socket for the TCP connection with the server
             InetSocketAddress address = new InetSocketAddress(serverAddr, SERVER_PORT);
+            // Timeout of 5 seconds
             int timeout = 5000;
             socket.setSoTimeout(timeout);
             socket.connect(address, timeout);
@@ -76,14 +69,14 @@ public class TcpClient {
             if(socket.isConnected()){
                 try {
 
-                    //sends the message to the server
+                    // Sends the message to the server
                     bufferOut = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
 
-                    //receives the message which the server sends back
+                    // Receives messages from, the server
                     bufferIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
 
-                    //in this while the client listens for the messages sent by the server
+                    // In this while-loop we listen for messages from the server as long as the server is running
                     while (run) {
 
                         if(bufferIn.ready()){
@@ -92,9 +85,10 @@ public class TcpClient {
                         }
 
                         if (serverMessage != null && messageListener != null) {
-                            //call the method messageReceived from MyActivity class
+                            // Calls the messageReceived method of the listener assigned in the TCPClient constructor
                             messageListener.messageReceived(serverMessage);
                             Log.d(TAG, "S: Received Message: '" + serverMessage + "'");
+                            // When a 'no' is received, there won't be anymore messages coming from the server, so the client can be closed
                             if(serverMessage.contains("no")) {
                                 stopClient();
                                 Log.d(TAG, "C: Socket Closed");
@@ -108,7 +102,7 @@ public class TcpClient {
                     stopClient();
                 }
                 finally {
-                    //the socket must be closed. It is not possible to reconnect to this socket
+                    // The socket must be closed. It is not possible to reconnect to this socket
                     // after it is closed, which means a new socket instance has to be created.
                     socket.close();
                     Log.e("TCP", "S: socket closed");
@@ -136,8 +130,7 @@ public class TcpClient {
         }
     }
 
-    //Declare the interface. The method messageReceived(String message) will must be implemented in the Activity
-    //class at on AsyncTask doInBackground
+    //Declares the interface for the listener which has to be defined by the class instantiating the TCPClient (see constructor)
     public interface OnMessageReceived {
         void messageReceived(String message);
     }

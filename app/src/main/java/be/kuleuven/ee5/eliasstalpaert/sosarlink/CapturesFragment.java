@@ -51,12 +51,13 @@ import static android.content.Context.JOB_SCHEDULER_SERVICE;
 public class CapturesFragment extends Fragment {
 
     private static final String TAG = CapturesFragment.class.getSimpleName();
-    private static boolean prompt_displayed = false;
     private static final int DEFAULT_POLLING_INTERVAL = 2;
     private static final String REMOTE_IMAGES_DIRECTORY = "/files";
     public static final int POLLINGJOB_ID = 1;
     public static final String POLLING_INTERVAL_KEY = "jobinterval";
     public static final String POLLING_ENABLE_KEY = "jobenable";
+
+    private static boolean prompt_displayed = false;
 
     private RecyclerView recyclerView;
     private RecyclerAdapter recyclerAdapter;
@@ -71,9 +72,11 @@ public class CapturesFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mainActivity = (MainActivity) getActivity();
+
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
         sharedPreferencesEditor = sharedPreferences.edit();
 
+        //Assigning BroadcastReceiver who receives a broadcast from PollingJob.ConnectTask whenever it adds a new capture to the stringList in SharedPreferences
         notificationReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -88,6 +91,7 @@ public class CapturesFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View fragmentView = inflater.inflate(R.layout.fragment_captures, container, false);
         recyclerView = fragmentView.findViewById(R.id.recyclerView);
+
         setupCapturesUI();
         setupRecyclerView();
 
@@ -130,6 +134,7 @@ public class CapturesFragment extends Fragment {
                 if (sharedPreferences.getBoolean(CapturesFragment.POLLING_ENABLE_KEY, true)) {
                     refreshPollingJob();
                 } else {
+                    //Start a single ConnectTask
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
@@ -155,14 +160,15 @@ public class CapturesFragment extends Fragment {
         mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
     }
 
+
+
     private AlertDialog buildAlertDialog(String title, int layoutId) {
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setTitle(title);
-        builder.setCancelable(false);
+        builder.setCancelable(false); //AlertDialog can't be dismissed, so the user has to perform an appropriate action
         builder.setView(layoutId);
         return builder.create();
     }
-
 
 
 
@@ -170,6 +176,8 @@ public class CapturesFragment extends Fragment {
         recyclerList = new ArrayList<>();
 
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(mainActivity);
+
+        //New entries are placed at the top of the RecyclerView
         linearLayoutManager.setReverseLayout(true);
         linearLayoutManager.setStackFromEnd(true);
 
@@ -181,7 +189,8 @@ public class CapturesFragment extends Fragment {
             }
         });
 
-        recyclerView.setHasFixedSize(true); //better performance
+        //Better performance: if RecyclerView has fixed size, other layouts in the hierarchy don't have to dynamically adjust when items are added/removed
+        recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(linearLayoutManager);
         recyclerView.setAdapter(recyclerAdapter);
 
@@ -206,6 +215,7 @@ public class CapturesFragment extends Fragment {
             Log.d(TAG, "Stringlist found");
             for (String s : stringList) addToRecyclerViewIfNotPresent(s);
             recyclerAdapter.notifyDataSetChanged();
+            //Automatically scroll to the top of the RecyclerView when a new entry is added
             recyclerView.smoothScrollToPosition(recyclerAdapter.getItemCount());
         } else {
             Log.d(TAG, "Stringlist not found");
@@ -246,6 +256,7 @@ public class CapturesFragment extends Fragment {
                 alertDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
                     @Override
                     public void onDismiss(DialogInterface dialogInterface) {
+                        //Returning the possibility to interact with the activity to the user
                         mainActivity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
                     }
                 });
@@ -253,6 +264,7 @@ public class CapturesFragment extends Fragment {
                 TextView textView = alertDialog.findViewById(R.id.downloadImageName);
                 textView.setText(image_name + "\nto\n" + mainActivity.getFilesDir());
 
+                //Removing user interaction with the activity when the image is downloading
                 mainActivity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
 
@@ -285,6 +297,7 @@ public class CapturesFragment extends Fragment {
     private void removeRecyclerItemByPosition(int position) {
         RecyclerItem recyclerItem = recyclerList.get(position);
         if (recyclerItem != null) {
+            //Remove the entry from the StringList that keeps track of all the satellite captures (stored in SharedPreferences)
             String toBeRemoved_string = recyclerItem.getSatelliteName() + recyclerItem.getTimeDate();
             ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mainActivity);
             if (stringList != null) {
@@ -306,7 +319,7 @@ public class CapturesFragment extends Fragment {
             } else {
                 Log.d(TAG, "Stringlist not found");
             }
-
+            //If present, remove the downloaded image from the internal storage
             removeImageFromStorage(getImageNameFromRecyclerItem(recyclerItem));
         }
         (recyclerAdapter).removeItemAtPosition(position);
@@ -332,6 +345,7 @@ public class CapturesFragment extends Fragment {
 
 
     private void promptServerIp() {
+        //In order to avoid multiple prompts being launched, a static boolean is used (may happen if there is a method used of the MainActivity-instance)
         prompt_displayed = true;
 
         final AlertDialog alertDialog = buildAlertDialog("Setup: IP", R.layout.ip_alertdialog);
@@ -422,6 +436,7 @@ public class CapturesFragment extends Fragment {
 
         final EditText username = alertDialog.findViewById(R.id.ftp_username);
         final EditText password = alertDialog.findViewById(R.id.ftp_password);
+        //Hide password text with dots
         password.setTransformationMethod(PasswordTransformationMethod.getInstance());
 
         Button submit = alertDialog.findViewById(R.id.ftpCredSubmit);
@@ -463,7 +478,7 @@ public class CapturesFragment extends Fragment {
                 }
 
                 jobScheduler.cancelAll();
-
+                //Give server IP and polling interval as extras to the job, so it can give it to the next job (job refreshes itself and needs a reference to these variables)
                 PersistableBundle extras = new PersistableBundle();
                 extras.putString(SettingsFragment.IP_KEY, ip);
                 extras.putInt(CapturesFragment.POLLING_INTERVAL_KEY, pollingInterval);
@@ -471,8 +486,10 @@ public class CapturesFragment extends Fragment {
                 JobInfo.Builder mJobBuilder =
                         new JobInfo.Builder(CapturesFragment.POLLINGJOB_ID,
                                 new ComponentName(mainActivity, PollingJob.class))
+                                //Scheduled jobs should persist between reboots of the device
                                 .setPersisted(true)
                                 .setExtras(extras)
+                                //The device should be connected to a WiFi network in order to let the job run (checking on SSID is only available since Android P, so this is the best we can do for now)
                                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
 
                 int resultCode = jobScheduler.schedule(mJobBuilder.build());
@@ -506,35 +523,6 @@ public class CapturesFragment extends Fragment {
         }
     }
 
-    private void viewFile(String localPath) {
-        if (localPath == null) {
-            Toast.makeText(mainActivity, "FTP Error: check ftp settings otherwise check log for exception", Toast.LENGTH_LONG).show();
-        } else {
-            File imagePath = new File(localPath);
-
-            if (imagePath.exists()) {
-
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(localPath, options);
-                if (options.outWidth != -1 && options.outHeight != -1) {
-                    Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
-
-                    Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
-                    galleryIntent.setDataAndType(uri, "image/*");
-                    galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                    mainActivity.startActivity(galleryIntent);
-                } else {
-                    Toast.makeText(mainActivity, "Failed: File not present on server", Toast.LENGTH_LONG).show();
-                    Log.d(TAG, "File not valid (not on server), deleting... " + imagePath.delete());
-                }
-            } else {
-                Log.d(TAG, "File not found");
-            }
-        }
-    }
-
 
     private class DownloadTask extends AsyncTask<String, Void, String> {
         private String imageName;
@@ -549,7 +537,7 @@ public class CapturesFragment extends Fragment {
 
         @Override
         protected String doInBackground(String... params) {
-
+            //Returns null if something went wrong concerning FTP Settings
             try {
                 File file = new File(localPath);
                 if (!file.exists()) {
@@ -583,6 +571,37 @@ public class CapturesFragment extends Fragment {
         protected void onPostExecute(String s) {
             alertDialog.dismiss();
             viewFile(s);
+        }
+    }
+
+    private void viewFile(String localPath) {
+        if (localPath == null) {
+            Toast.makeText(mainActivity, "FTP Error: check ftp settings otherwise check log for exception", Toast.LENGTH_LONG).show();
+        } else {
+            File imagePath = new File(localPath);
+
+            if (imagePath.exists()) {
+
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(localPath, options);
+                //Check if the file that is present on the system, is a valid image file
+                if (options.outWidth != -1 && options.outHeight != -1) {
+                    Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
+
+                    Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
+                    galleryIntent.setDataAndType(uri, "image/*");
+                    galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    mainActivity.startActivity(galleryIntent);
+                } else {
+                    //If the present file isn't an image, this means it wasn't on the server (easyFTP always creates a file when trying to download something (container for the inputstream))
+                    Toast.makeText(mainActivity, "Failed: File not present on server", Toast.LENGTH_LONG).show();
+                    Log.d(TAG, "File not valid (not on server), deleting... " + imagePath.delete());
+                }
+            } else {
+                Log.d(TAG, "File not found");
+            }
         }
     }
 }

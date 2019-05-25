@@ -64,9 +64,11 @@ public class SettingsFragment extends Fragment {
     }
 
     private void setupSettingsUI() {
+        //Need to specify that the fragment has its own actions in the options menu
         this.setHasOptionsMenu(true);
         mainActivity.setTitle("Settings");
         mainActivity.getNavigationView().setCheckedItem(R.id.nav_ftp);
+        //Hide password with dots
         passEdit.setTransformationMethod(PasswordTransformationMethod.getInstance());
 
         refreshUIData();
@@ -83,7 +85,8 @@ public class SettingsFragment extends Fragment {
             userEdit.setText("");
             passEdit.setText("");
         }
-        ipEdit.setText(server_ip); //server_ip != null
+        //The IP setup in the PassesFragment (the initial fragment) isn't cancelable so the IP will be set and not null (no check needed)
+        ipEdit.setText(server_ip);
     }
 
     @Override

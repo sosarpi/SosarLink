@@ -36,14 +36,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
-        editor.clear();
-        editor.apply();
-
         navigationView = findViewById(R.id.nav_view);
         drawer = findViewById(R.id.drawer_layout);
-        setupGeneralUI();
 
+        setupGeneralUI();
+        //Start with a CapturesFragment as the initial Fragment
         getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
                 new CapturesFragment()).commit();
         navigationView.setCheckedItem(R.id.nav_passes);
@@ -61,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+        //Navigate between fragments using the menu of the NavigationView
         switch (menuItem.getItemId()) {
             case R.id.nav_ftp:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
@@ -75,17 +73,20 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return true;
     }
 
+    //Method made static in order to let the PollingJob.ConnectTask access the StringList contained in the SharedPreferences of the app (which it cannot access)
     public static void saveArrayList(ArrayList<String> list, String key, Context context){
+        //In order to save the ArrayList to the SharedPreferences, we have to serialize it into the JSON-format
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         SharedPreferences.Editor editor = prefs.edit();
         Gson gson = new Gson();
         String json = gson.toJson(list);
         editor.putString(key, json);
-        editor.apply();     // This line is IMPORTANT !!!
+        editor.apply();
         Log.d(TAG, "ArrayList saved");
     }
-
+    //Same reason as for the method above
     public static ArrayList<String> getArrayList(String key, Context context){
+        //Deserialize the ArrayList from the JSON-format
         Log.d(TAG, "Trying to receive ArrayList");
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         Gson gson = new Gson();
@@ -94,6 +95,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return gson.fromJson(json, type);
     }
 
+    //Method used to check if a string doesn't consist of only whitespaces (checks for at least 1 ASCII-character)
     public boolean hasAlphanumeric(String s) {
         return s.matches(".*\\w.*");
     }
