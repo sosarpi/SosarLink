@@ -1,10 +1,9 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
-import android.app.job.JobInfo;
-import android.app.job.JobScheduler;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.DhcpInfo;
+import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
@@ -15,8 +14,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 
 import com.google.gson.Gson;
@@ -24,110 +21,30 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
-    private static final String TAG = "MainActivity";
+    private static final String TAG = MainActivity.class.getSimpleName();
     public static final String LIST_NAME = "satellite";
 
     private DrawerLayout drawer;
-    private NavigationView mNavigationView;
+    private NavigationView navigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(this).edit();
-        //editor.clear();
-        //editor.apply();
-
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-
-        mNavigationView = findViewById(R.id.nav_view);
-        mNavigationView.setNavigationItemSelectedListener(this);
-
+        navigationView = findViewById(R.id.nav_view);
         drawer = findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar,
-                R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.addDrawerListener(toggle);
-        toggle.syncState();
 
+        setupGeneralUI();
+        //Start with a CapturesFragment as the initial Fragment
         getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                new PassesFragment()).commit();
-        mNavigationView.setCheckedItem(R.id.nav_passes);
+                new CapturesFragment()).commit();
+        navigationView.setCheckedItem(R.id.nav_passes);
 
-        initialJob(); //Schedule Jobs
-
-    }
-
-    public NavigationView getmNavigationView() {
-        return mNavigationView;
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    }
-
-    public void initialJob() {
-        /*
-        ComponentName componentName = new ComponentName(this, Job.class);
-        JobInfo info = new JobInfo.Builder(1, componentName)
-                .setPersisted(true)            //Na reboot zal job nog altijd onthouden worden.
-                .setPeriodic(1 * 60 * 1000)    //Job iedere 30 minuten. Minimum mogelijk in te stellen is 15 minuten.
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-                .build();
-        */
-
-        JobInfo.Builder mJobBuilder =
-                new JobInfo.Builder(1,
-                        new ComponentName(this, Job.class))
-                .setPersisted(true)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-
-        JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-        int resultCode = scheduler.schedule(mJobBuilder.build());
-        if (resultCode == JobScheduler.RESULT_SUCCESS) {
-            Log.d(TAG, "Initial job successfully scheduled");
-        } else {
-            Log.d(TAG, "Failed to schedule initial job");
-        }
-    }
-
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
-        switch (menuItem.getItemId()) {
-            case R.id.nav_ftp:
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                        new FtpFragment()).commit();
-                break;
-            case R.id.nav_passes:
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
-                        new PassesFragment()).commit();
-        }
-
-        drawer.closeDrawer(GravityCompat.START);
-        return true;
-    }
-
-    public static void saveArrayList(ArrayList<String> list, String key, Context context){
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        SharedPreferences.Editor editor = prefs.edit();
-        Gson gson = new Gson();
-        String json = gson.toJson(list);
-        editor.putString(key, json);
-        editor.apply();     // This line is IMPORTANT !!!
-        Log.d("Static", "ArrayList saved");
-    }
-
-    public static ArrayList<String> getArrayList(String key, Context context){
-        Log.d("Static", "Trying to receive ArrayList");
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        Gson gson = new Gson();
-        String json = prefs.getString(key, null);
-        Type type = new TypeToken<ArrayList<String>>() {}.getType();
-        return gson.fromJson(json, type);
     }
 
     @Override
@@ -139,5 +56,88 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
+    @Override
+    public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+        //Navigate between fragments using the menu of the NavigationView
+        switch (menuItem.getItemId()) {
+            case R.id.nav_ftp:
+                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
+                        new SettingsFragment()).commit();
+                break;
+            case R.id.nav_passes:
+                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
+                        new CapturesFragment()).commit();
+        }
+
+        drawer.closeDrawer(GravityCompat.START);
+        return true;
+    }
+
+    //Method made static in order to let the PollingJob.ConnectTask access the StringList contained in the SharedPreferences of the app (which it cannot access)
+    public static void saveArrayList(ArrayList<String> list, String key, Context context) {
+        //In order to save the ArrayList to the SharedPreferences, we have to serialize it into the JSON-format
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor editor = prefs.edit();
+        Gson gson = new Gson();
+        String json = gson.toJson(list);
+        editor.putString(key, json);
+        editor.apply();
+        Log.d(TAG, "ArrayList saved");
+    }
+
+    //Same reason as for the method above
+    public static ArrayList<String> getArrayList(String key, Context context) {
+        //Deserialize the ArrayList from the JSON-format
+        Log.d(TAG, "Trying to receive ArrayList");
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        Gson gson = new Gson();
+        String json = prefs.getString(key, null);
+        Type type = new TypeToken<ArrayList<String>>() {
+        }.getType();
+        return gson.fromJson(json, type);
+    }
+
+    //Method used to check if a string doesn't consist of only whitespaces (checks for at least 1 ASCII-character)
+    public boolean hasAlphanumeric(String s) {
+        return s.matches(".*\\w.*");
+    }
+
+    public boolean isAnIpv4Address(String text) {
+        Pattern p = Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+        Matcher m = p.matcher(text);
+        return m.find();
+    }
+
+    public String getGatewayIp() {
+        WifiManager wifiManager = (WifiManager) this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
+        return formatIP(dhcpInfo.gateway);
+    }
+
+    private String formatIP(int ip) {
+        return String.format(
+                "%d.%d.%d.%d",
+                (ip & 0xff),
+                (ip >> 8 & 0xff),
+                (ip >> 16 & 0xff),
+                (ip >> 24 & 0xff)
+        );
+    }
+
+    public NavigationView getNavigationView() {
+        return navigationView;
+    }
+
+    private void setupGeneralUI() {
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
+
+        navigationView.setNavigationItemSelectedListener(this);
+
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar,
+                R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        drawer.addDrawerListener(toggle);
+        toggle.syncState();
+    }
 }
 

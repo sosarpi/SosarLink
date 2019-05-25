@@ -1,7 +1,6 @@
 package be.kuleuven.ee5.eliasstalpaert.sosarlink;
 
 import android.util.Log;
-import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -15,124 +14,98 @@ import java.net.SocketTimeoutException;
 
 public class TcpClient {
 
-    public static final String TAG = TcpClient.class.getSimpleName();
-    public static final String SERVER_IP = "10.42.0.1"; //server IP address
-    public static final int SERVER_PORT = 5678;
-    // message to send to the server
-    private String mServerMessage;
-    // sends message received notifications
-    private OnMessageReceived mMessageListener = null;
-    // while this is true, the server will continue running
-    private boolean mRun = false;
-    // used to send messages
-    private PrintWriter mBufferOut;
-    // used to read messages from the server
-    private BufferedReader mBufferIn;
+    private static final String TAG = TcpClient.class.getSimpleName();
+    private static final int SERVER_PORT = 5678;
+    private String serverMessage;
+    private OnMessageReceived messageListener;
+    private boolean run = false;
+    // Used to send messages
+    private PrintWriter bufferOut;
+    // Used to read messages from the server
+    private BufferedReader bufferIn;
 
-    /**
-     * Constructor of the class. OnMessagedReceived listens for the messages received from server
-     */
-    public TcpClient(OnMessageReceived listener) {
-        mMessageListener = listener;
+    private String serverIp;
+
+    // The messageListener listens for messages received from the server
+    public TcpClient(OnMessageReceived listener, String ip) {
+        this.serverIp = ip;
+        this.messageListener = listener;
     }
 
-    /**
-     * Sends the message entered by client to the server
-     *
-     * @param message text entered by client
-     */
-    public void sendMessage(final char message) {
-        Runnable runnable = new Runnable() {
-            @Override
-            public void run() {
-                if (mBufferOut != null) {
-                    Log.d(TAG, "Sending: " + message);
-                    mBufferOut.println(message);
-                    mBufferOut.flush();
-                }
-            }
-        };
-        Thread thread = new Thread(runnable);
-        thread.start();
-    }
+    // Close connection and release its member variables
+    private void stopClient() {
 
-    /**
-     * Close the connection and release the members
-     */
-    public void stopClient() {
+        run = false;
 
-        mRun = false;
-
-        if (mBufferOut != null) {
-            mBufferOut.flush();
-            mBufferOut.close();
+        if (bufferOut != null) {
+            bufferOut.flush();
+            bufferOut.close();
         }
 
-        mMessageListener = null;
-        mBufferIn = null;
-        mBufferOut = null;
-        mServerMessage = null;
+        messageListener = null;
+        bufferIn = null;
+        bufferOut = null;
+        serverMessage = null;
     }
 
-    public void run(){
+    public void run() {
 
-        mRun = true;
+        run = true;
         Socket socket = new Socket();
 
         try {
-            //here you must put your computer's IP address.
-            InetAddress serverAddr = InetAddress.getByName(SERVER_IP);
+            // Gets the server address
+            InetAddress serverAddr = InetAddress.getByName(this.serverIp);
 
-            Log.d("TCP Client", "C: Connecting...");
+            Log.d(TAG, "C: Connecting...");
 
-            //create a socket to make the connection with the server
+            // Create socket for the TCP connection with the server
             InetSocketAddress address = new InetSocketAddress(serverAddr, SERVER_PORT);
+            // Timeout of 5 seconds
             int timeout = 5000;
             socket.setSoTimeout(timeout);
             socket.connect(address, timeout);
 
-            if(socket.isConnected()){
+            if (socket.isConnected()) {
                 try {
 
-                    //sends the message to the server
-                    mBufferOut = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+                    // Sends the message to the server
+                    bufferOut = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
 
-                    //receives the message which the server sends back
-                    mBufferIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    // Receives messages from, the server
+                    bufferIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
 
-                    //in this while the client listens for the messages sent by the server
-                    while (mRun) {
+                    // In this while-loop we listen for messages from the server as long as the server is running
+                    while (run) {
 
-                        if(mBufferIn.ready()){
-                            mServerMessage = mBufferIn.readLine();
-                            mServerMessage = mBufferIn.readLine();
+                        if (bufferIn.ready()) {
+                            serverMessage = bufferIn.readLine();
+                            serverMessage = bufferIn.readLine();
                         }
 
-                        if (mServerMessage != null && mMessageListener != null) {
-                            //call the method messageReceived from MyActivity class
-                            mMessageListener.messageReceived(mServerMessage);
-                            Log.d("RESPONSE FROM SERVER", "S: Received Message: '" + mServerMessage + "'");
-                            if(mServerMessage.contains("no")) {
+                        if (serverMessage != null && messageListener != null) {
+                            // Calls the messageReceived method of the listener assigned in the TCPClient constructor
+                            messageListener.messageReceived(serverMessage);
+                            Log.d(TAG, "S: Received Message: '" + serverMessage + "'");
+                            // When a 'no' is received, there won't be anymore messages coming from the server, so the client can be closed
+                            if (serverMessage.contains("no")) {
                                 stopClient();
-                                Log.d("TCP Client", "C: Socket Closed");
+                                Log.d(TAG, "C: Socket Closed");
                             }
                         }
 
                     }
-                }
-                catch (SocketTimeoutException e) {
+                } catch (SocketTimeoutException e) {
                     Log.e("TCP", "S: socket timed out");
                     stopClient();
-                }
-                finally {
-                    //the socket must be closed. It is not possible to reconnect to this socket
+                } finally {
+                    // The socket must be closed. It is not possible to reconnect to this socket
                     // after it is closed, which means a new socket instance has to be created.
                     socket.close();
                     Log.e("TCP", "S: socket closed");
                 }
-            }
-            else {
+            } else {
                 stopClient();
                 socket.close();
                 Log.e("TCP", "S: no connection");
@@ -142,22 +115,19 @@ public class TcpClient {
             stopClient();
             try {
                 socket.close();
-            }
-            catch(Exception socket_e) {
+            } catch (Exception socket_e) {
                 Log.e("TCP", "C: Error", socket_e);
             }
             Log.e("TCP", "S: no connection");
             Log.e("TCP", "S: socket closed");
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             Log.e("TCP", "C: Error", e);
         }
     }
 
-    //Declare the interface. The method messageReceived(String message) will must be implemented in the Activity
-    //class at on AsyncTask doInBackground
+    //Declares the interface for the listener which has to be defined by the class instantiating the TCPClient (see constructor)
     public interface OnMessageReceived {
-        public void messageReceived(String message);
+        void messageReceived(String message);
     }
 
 }
