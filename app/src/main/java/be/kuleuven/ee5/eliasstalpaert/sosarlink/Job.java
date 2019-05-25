@@ -21,20 +21,22 @@ import java.util.Iterator;
 
 public class Job extends JobService {
     private static final String TAG = Job.class.getSimpleName();
-    private static final int INTERVAL = 5;
+    private static final int DEFAULT_INTERVAL = 5;
 
     private JobParameters mParams;
     private String server_ip;
+    private int polling_interval;
 
     //onStartJob called when job launched
     @Override
     public boolean onStartJob(JobParameters params) {
         Log.d(TAG, "Job started");
         this.mParams = params;
+        PersistableBundle extras = params.getExtras();
+        this.polling_interval = extras.getInt(PassesFragment.JOB_INTERVAL_KEY, Job.DEFAULT_INTERVAL);
         this.server_ip = params.getExtras().getString(FtpFragment.FTPIP_KEY);
         scheduleRefresh();
         doBackGroundWork(params);
-
         return true;
     }
 
@@ -54,7 +56,9 @@ public class Job extends JobService {
                 Log.d(TAG, "ConnectTask started");
             }
         }).start();
+        jobFinished(params, false);
     }
+
 
     //onStopJob is called when Job failes/gets interrupted.
 
@@ -67,9 +71,10 @@ public class Job extends JobService {
                                 Job.class));
         PersistableBundle extras = new PersistableBundle();
         extras.putString(FtpFragment.FTPIP_KEY, this.server_ip);
+        extras.putInt(PassesFragment.JOB_INTERVAL_KEY, this.polling_interval);
 
         mJobBuilder
-                .setMinimumLatency(INTERVAL * 60 * 1000) //tijdsinterval
+                .setMinimumLatency(polling_interval * 60 * 1000) //tijdsinterval
                 .setPersisted(true)
                 .setExtras(extras)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
@@ -82,7 +87,7 @@ public class Job extends JobService {
         }
     }
 
-    private class ConnectTask extends AsyncTask<String, String, TcpClient> {
+    protected static class ConnectTask extends AsyncTask<String, String, TcpClient> {
 
         private Context mContext;
         private NotificationManager mNotificationManager;
@@ -94,9 +99,9 @@ public class Job extends JobService {
 
         private String server_ip;
 
-        ConnectTask(Context mContext, String server_ip) {
+        ConnectTask(Context context, String server_ip) {
             super();
-            this.mContext = mContext;
+            this.mContext = context;
             this.server_ip = server_ip;
             this.notificationID = 0;
             this.fullCaptureReceived = false;
@@ -116,10 +121,6 @@ public class Job extends JobService {
         @Override
         protected void onPostExecute(TcpClient tcpClient) {
             super.onPostExecute(tcpClient);
-            if (mParams != null) {
-                Log.d(TAG, "Job finished");
-                jobFinished(mParams, false);
-            }
         }
 
         @Override
@@ -133,7 +134,7 @@ public class Job extends JobService {
                     //this method calls the onProgressUpdate
                     publishProgress(message);
                 }
-            }, this.server_ip,getApplicationContext());
+            }, this.server_ip, mContext);
 
             mTcpClient.run();
 
@@ -160,7 +161,7 @@ public class Job extends JobService {
             } else if (values[0].contains("no")) {
                 if (fullCaptureReceived) {
                     Intent new_satellite = new Intent("SATELLITE");
-                    sendBroadcast(new_satellite);
+                    mContext.sendBroadcast(new_satellite);
                     fullCaptureReceived = false;
                 }
                 numberOfReceivedParts = 0;
@@ -197,8 +198,8 @@ public class Job extends JobService {
         }
 
         private void pushNotification(String nMessage) {
-            Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-            PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, intent, 0);
+            Intent intent = new Intent(mContext, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, intent, 0);
 
             Notification.Builder notificationBuilder = new Notification.Builder(mContext)
                     .setContentTitle("New weather satellite picture!")
@@ -217,23 +218,22 @@ public class Job extends JobService {
         }
 
         private void updateSharedPreferences(String pref_message) {
-            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, getApplicationContext());
+            ArrayList<String> stringList = MainActivity.getArrayList(MainActivity.LIST_NAME, mContext);
             if (stringList == null) {
                 stringList = new ArrayList<>();
             }
-            Iterator<String> iterator = stringList.iterator();
             boolean found = false;
-            while (iterator.hasNext() && !found) {
-                String next = iterator.next();
+            for (String next : stringList) {
                 if (next.equals(pref_message)) {
                     found = true;
+                    break;
                 }
             }
             if (!found) {
                 stringList.add(pref_message);
                 Log.d(TAG, "New string added to sharedpreferences");
             }
-            MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, getApplicationContext());
+            MainActivity.saveArrayList(stringList, MainActivity.LIST_NAME, mContext);
         }
     }
 }

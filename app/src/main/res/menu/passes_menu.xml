@@ -2,12 +2,16 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/deleteAll"
+        android:id="@+id/deleteAllMenu"
         android:title="Delete all"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/jobSettingsMenu"
+        android:title="Change polling settings"
+        app:showAsAction="never" />
     <item
         android:id="@+id/refreshButton"
-        android:title="Refresh"
         android:icon="@drawable/ic_refresh"
-        app:showAsAction="always"/>
+        android:title="Refresh"
+        app:showAsAction="always" />
 </menu>

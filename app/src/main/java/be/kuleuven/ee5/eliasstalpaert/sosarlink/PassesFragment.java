@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.ColorDrawable;
 import android.net.DhcpInfo;
 import android.net.Uri;
@@ -35,6 +37,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,6 +53,7 @@ public class PassesFragment extends Fragment {
 
     private static final String TAG = PassesFragment.class.getSimpleName();
     private static boolean prompt_displayed = false;
+    private static final int DEFAULT_INTERVAL = 2;
     public static final String JOB_INTERVAL_KEY = "jobinterval";
     public static final String JOB_ENABLE_KEY = "jobenable";
 
@@ -74,6 +78,8 @@ public class PassesFragment extends Fragment {
         mainActivity = (MainActivity) getActivity();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity);
         mainActivity.setTitle("Captures");
+
+        refreshJob();
 
         mNotificationReceiver = new BroadcastReceiver() {
             @Override
@@ -123,13 +129,27 @@ public class PassesFragment extends Fragment {
 
         int id = item.getItemId();
 
-        if (id == R.id.deleteAll) {
-            removeAllRecyclerItems();
-        }
-        if (id == R.id.refreshButton) {
-            if (refreshJob()) {
-                Toast.makeText(mainActivity, "Manually refreshed jobs", Toast.LENGTH_SHORT).show();
-            }
+        switch (id) {
+            case R.id.deleteAllMenu:
+                removeAllRecyclerItems();
+                break;
+            case R.id.refreshButton:
+                if (sharedPreferences.getBoolean(PassesFragment.JOB_ENABLE_KEY, true)) {
+                    refreshJob();
+                } else {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            new Job.ConnectTask(mainActivity, sharedPreferences.getString(FtpFragment.FTPIP_KEY, null)).execute("");
+                            Log.d(TAG, "ConnectTask started");
+                        }
+                    }).start();
+                    Toast.makeText(mainActivity, "Refreshed manually", Toast.LENGTH_SHORT);
+                }
+                break;
+            case R.id.jobSettingsMenu:
+                jobSettingsDialog();
+                break;
         }
 
         return super.onOptionsItemSelected(item);
@@ -138,6 +158,56 @@ public class PassesFragment extends Fragment {
     private void setCustomBackground() {
         mRecyclerView.setBackgroundResource(R.drawable.background_space1);
         mainActivity.getSupportActionBar().setBackgroundDrawable(new ColorDrawable(getResources().getColor(R.color.spaceAccent)));
+    }
+
+    private void jobSettingsDialog() {
+        final SharedPreferences.Editor editor = sharedPreferences.edit();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+        builder.setTitle("Polling Settings");
+        builder.setCancelable(false);
+        builder.setView(R.layout.job_settings);
+        final AlertDialog alertDialog = builder.create();
+        alertDialog.show();
+
+        Button save = alertDialog.findViewById(R.id.savePollingSettings);
+        Button cancel = alertDialog.findViewById(R.id.cancelPollingSettings);
+
+        final EditText interval = alertDialog.findViewById(R.id.pollingInt);
+        if (interval != null) {
+            interval.setText(String.valueOf(sharedPreferences.getInt(PassesFragment.JOB_INTERVAL_KEY, 0)));
+        }
+        //interval.setText();
+
+        final Switch enable = alertDialog.findViewById(R.id.pollingEnable);
+        enable.setChecked(sharedPreferences.getBoolean(PassesFragment.JOB_ENABLE_KEY, true));
+
+
+        save.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                try {
+                    int num = Integer.parseInt(interval.getText().toString());
+                    if (num <= 0) {
+                        throw new NumberFormatException();
+                    }
+                    editor.putInt(PassesFragment.JOB_INTERVAL_KEY, num);
+                    editor.putBoolean(PassesFragment.JOB_ENABLE_KEY, enable.isChecked());
+                    editor.apply();
+                    Toast.makeText(mainActivity, "Polling settings saved", Toast.LENGTH_SHORT).show();
+                    refreshJob();
+                    alertDialog.dismiss();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(mainActivity, "Please enter a valid interval", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                alertDialog.cancel();
+            }
+        });
     }
 
 
@@ -300,6 +370,7 @@ public class PassesFragment extends Fragment {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
         builder.setTitle("First Time Setup: IP");
+        builder.setCancelable(false);
         builder.setView(R.layout.ip_alarmdialog);
         final AlertDialog alertDialog = builder.create();
         alertDialog.show();
@@ -390,33 +461,48 @@ public class PassesFragment extends Fragment {
 
 
     private boolean refreshJob() {
-        String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
-        if (ip == null) {
-            Log.d(TAG, "server_ip is null af (refreshJob)");
-            promptForIp();
-            return false;
-        } else {
-            JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
-            mJobScheduler.cancelAll();
+        boolean enable = sharedPreferences.getBoolean(PassesFragment.JOB_ENABLE_KEY, true);
+        int interval = sharedPreferences.getInt(PassesFragment.JOB_INTERVAL_KEY, 0);
 
-            PersistableBundle extras = new PersistableBundle();
-            extras.putString(FtpFragment.FTPIP_KEY, ip);
-
-            JobInfo.Builder mJobBuilder =
-                    new JobInfo.Builder(1,
-                            new ComponentName(mainActivity, Job.class))
-                            .setPersisted(true)
-                            .setExtras(extras)
-                            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
-
-            int resultCode = mJobScheduler.schedule(mJobBuilder.build());
-            if (resultCode == JobScheduler.RESULT_SUCCESS) {
-                Log.d(TAG, "Jobs refreshed successfully");
-                return true;
-            } else {
-                Log.d(TAG, "Failed to refresh jobs");
+        JobScheduler mJobScheduler = (JobScheduler) mainActivity.getSystemService(JOB_SCHEDULER_SERVICE);
+        if (enable) {
+            String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
+            if (ip == null) {
+                Log.d(TAG, "server_ip is null af (refreshJob)");
+                promptForIp();
                 return false;
+            } else {
+                if (interval <= 0) {
+                    interval = PassesFragment.DEFAULT_INTERVAL;
+                    sharedPreferences.edit().putInt(PassesFragment.JOB_INTERVAL_KEY, PassesFragment.DEFAULT_INTERVAL).apply();
+                }
+
+                mJobScheduler.cancelAll();
+
+                PersistableBundle extras = new PersistableBundle();
+                extras.putString(FtpFragment.FTPIP_KEY, ip);
+                extras.putInt(PassesFragment.JOB_INTERVAL_KEY, interval);
+
+                JobInfo.Builder mJobBuilder =
+                        new JobInfo.Builder(1,
+                                new ComponentName(mainActivity, Job.class))
+                                .setPersisted(true)
+                                .setExtras(extras)
+                                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
+
+                int resultCode = mJobScheduler.schedule(mJobBuilder.build());
+                if (resultCode == JobScheduler.RESULT_SUCCESS) {
+                    Log.d(TAG, "Jobs refreshed with interval: " + interval + " minutes");
+                    return true;
+                } else {
+                    Log.d(TAG, "Failed to refresh jobs");
+                    return false;
+                }
             }
+        } else {
+            mJobScheduler.cancelAll();
+            Log.d(TAG, "Canceled all jobs");
+            return true;
         }
     }
 
@@ -442,13 +528,27 @@ public class PassesFragment extends Fragment {
             Toast.makeText(mainActivity, "FTP Error: check ftp settings otherwise check log for exception", Toast.LENGTH_LONG).show();
         } else {
             File imagePath = new File(localPath);
-            Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
 
-            Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
+            if (imagePath.exists()) {
 
-            galleryIntent.setDataAndType(uri, "image/*");
-            galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            mainActivity.startActivity(galleryIntent);
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                Bitmap bitmap = BitmapFactory.decodeFile(localPath, options);
+                if (options.outWidth != -1 && options.outHeight != -1) {
+                    Intent galleryIntent = new Intent(android.content.Intent.ACTION_VIEW);
+
+                    Uri uri = FileProvider.getUriForFile(mainActivity, BuildConfig.APPLICATION_ID + ".provider", imagePath);
+
+                    galleryIntent.setDataAndType(uri, "image/*");
+                    galleryIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    mainActivity.startActivity(galleryIntent);
+                } else {
+                    Toast.makeText(mainActivity, "File not present on server", Toast.LENGTH_LONG).show();
+                    Log.d(TAG, "File not valid (not on server), deleting... " + imagePath.delete());
+                }
+            } else {
+                Log.d(TAG, "File not found");
+            }
         }
     }
 
@@ -478,17 +578,14 @@ public class PassesFragment extends Fragment {
                     String ip = sharedPreferences.getString(FtpFragment.FTPIP_KEY, null);
                     String password = sharedPreferences.getString(FtpFragment.FTPPASS_KEY, null);
                     ftp.connect(ip, username, password);
-                    if(ftp.getFtpClient().isConnected()){
+                    if (ftp.getFtpClient().isConnected()) {
                         if (ftp.getFtpClient().login(username, password)) {
                             ftp.downloadFile(getString(R.string.path_of_images) + image_name, local_path);
                             Log.d(TAG, "Download Successfull");
                             return local_path;
-                        }
-                        else return null;
-                    }
-                    else return null;
-                }
-                else return local_path;
+                        } else return null;
+                    } else return null;
+                } else return local_path;
 
             } catch (Exception e) {
                 e.printStackTrace();

@@ -11,5 +11,9 @@
     <string name="ftp_password_prompt">Please enter FTP password</string>
     <string name="ip_alarmdialog">Enter an IP or choose default gateway IP</string>
     <string name="manualip_hint">Manual IP</string>
+    <string name="interval">Interval</string>
+    <string name="interval_hint">Interval (minutes)</string>
+    <string name="enable_hint">Enable Polling</string>
+    <string name="save_settings">Save settings</string>
     <string name="gateway">Default gateway address</string>
 </resources>
