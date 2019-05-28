@@ -51,7 +51,7 @@ public class CapturesFragment extends Fragment {
 
     private static final String TAG = CapturesFragment.class.getSimpleName();
     private static final int DEFAULT_POLLING_INTERVAL = 2;
-    private static final String REMOTE_IMAGES_DIRECTORY = "/files";
+    private static final String REMOTE_IMAGES_DIRECTORY = "/home/pi/weather";
     public static final int POLLINGJOB_ID = 1;
     public static final String POLLING_INTERVAL_KEY = "jobinterval";
     public static final String POLLING_ENABLE_KEY = "jobenable";
